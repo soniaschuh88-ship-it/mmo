@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVA — World</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#e0d8c8;font-family:'Segoe UI',sans-serif;overflow:hidden;height:100vh}
+canvas{display:block;image-rendering:pixelated}
+
+/* ── Character Creator ── */
+#creator{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#0a0a1a 0%,#1a0a0a 100%);z-index:100}
+#creator h1{font-size:2.5rem;color:#d4a017;text-shadow:0 0 20px #d4a01780;letter-spacing:4px;margin-bottom:0.4rem}
+#creator p{color:#888;margin-bottom:2rem;font-size:0.9rem}
+.creator-name{display:flex;gap:10px;margin-bottom:1.5rem;align-items:center}
+.creator-name label{color:#aaa;font-size:0.9rem}
+.creator-name input{background:#1a1a2e;border:1px solid #444;color:#e0d8c8;padding:8px 14px;border-radius:6px;font-size:1rem;width:220px;outline:none}
+.creator-name input:focus{border-color:#d4a017}
+.class-grid{display:flex;gap:16px;margin-bottom:2rem}
+.class-card{width:160px;background:#111128;border:2px solid #333;border-radius:10px;padding:18px;cursor:pointer;transition:.2s;text-align:center}
+.class-card:hover{border-color:#d4a017;transform:translateY(-3px)}
+.class-card.selected{border-color:#d4a017;background:#1c1830;box-shadow:0 0 20px #d4a01730}
+.class-icon{font-size:2.8rem;margin-bottom:8px}
+.class-name{font-size:1rem;font-weight:700;color:#d4a017;margin-bottom:6px}
+.class-desc{font-size:0.75rem;color:#888;margin-bottom:10px;line-height:1.4}
+.class-stats{font-size:0.72rem;text-align:left}
+.class-stats div{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #2a2a3a}
+.class-stats span.val{color:#6af}
+#btn-enter{background:#d4a017;color:#000;border:none;padding:12px 40px;border-radius:8px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:.2s;letter-spacing:1px}
+#btn-enter:hover{background:#f0b820;transform:scale(1.04)}
+#btn-enter:disabled{background:#555;color:#333;cursor:not-allowed;transform:none}
+
+/* ── Game ── */
+#game{position:fixed;inset:0;display:none}
+#world-canvas{position:absolute;inset:0}
+
+/* ── HUD ── */
+#hud{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.hud-bar{display:flex;align-items:center;gap:8px}
+.hud-bar label{font-size:0.72rem;color:#999;width:24px;text-align:right}
+.bar-bg{width:160px;height:10px;background:#222;border-radius:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:5px;transition:width .3s}
+.bar-hp{background:linear-gradient(90deg,#c02020,#f04040)}
+.bar-mp{background:linear-gradient(90deg,#1060c0,#30a0f0)}
+.bar-xp{background:linear-gradient(90deg,#806000,#d4a017)}
+.bar-val{font-size:0.72rem;color:#aaa;width:55px}
+#hud-info{font-size:0.8rem;color:#aaa;margin-top:4px;line-height:1.6}
+#hud-info span{color:#d4a017;font-weight:600}
+
+/* ── Keys hint ── */
+#hint{position:absolute;bottom:10px;left:10px;font-size:0.7rem;color:#555;pointer-events:none;line-height:1.8}
+
+/* ── Quest panel ── */
+#quest-panel{position:absolute;top:10px;right:10px;width:240px;background:#0d0d1e;border:1px solid #333;border-radius:8px;padding:12px;display:none}
+#quest-panel h3{color:#d4a017;font-size:0.85rem;margin-bottom:8px;border-bottom:1px solid #333;padding-bottom:6px}
+.quest-item{margin-bottom:8px;font-size:0.75rem;line-height:1.5}
+.quest-title{color:#c0a060;font-weight:600}
+.quest-obj{color:#aaa}
+.quest-done{color:#4a4}
+#btn-quests{position:absolute;top:10px;right:10px;background:#1a1a2e;border:1px solid #444;color:#d4a017;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem}
+#btn-quests:hover{background:#2a2a4e}
+
+/* ── Dialogue box ── */
+#dialogue{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);width:600px;background:#0d0d1e;border:2px solid #d4a017;border-radius:10px;padding:16px;display:none}
+#dialogue-name{color:#d4a017;font-weight:700;font-size:0.9rem;margin-bottom:6px}
+#dialogue-text{font-size:0.85rem;color:#ddd;line-height:1.5;margin-bottom:10px}
+.dialogue-choices{display:flex;flex-direction:column;gap:6px}
+.dialogue-choice{background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:0.8rem;text-align:left;color:#c0d0f0;transition:.15s}
+.dialogue-choice:hover{background:#2a2a5e;border-color:#d4a017}
+
+/* ── Combat log ── */
+#combat-log{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:400px;max-height:100px;overflow:hidden;pointer-events:none}
+.log-line{font-size:0.75rem;color:#aaa;text-align:center;animation:fadeIn .3s}
+.log-line.hit{color:#f88}
+.log-line.crit{color:#fd0;font-weight:700}
+.log-line.dead{color:#f40;font-weight:700}
+.log-line.heal{color:#4f8}
+.log-line.xp{color:#d4a017}
+.log-line.quest{color:#a8e;font-weight:600}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Floating damage ── */
+.float-text{position:absolute;font-size:1rem;font-weight:700;pointer-events:none;animation:floatUp .9s ease-out forwards}
+@keyframes floatUp{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-50px)}}
+
+/* ── Minimap ── */
+#minimap{position:absolute;bottom:10px;right:10px;width:120px;height:120px;background:#0a0a18;border:1px solid #333;border-radius:4px;overflow:hidden}
+#minimap canvas{display:block}
+
+/* ── Notification ── */
+#notif{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#0d0d1e;border:2px solid #d4a017;border-radius:10px;padding:16px 28px;font-size:1.1rem;font-weight:700;color:#d4a017;display:none;text-align:center;z-index:50;animation:popIn .3s}
+@keyframes popIn{from{transform:translate(-50%,-50%) scale(0.7)}to{transform:translate(-50%,-50%) scale(1)}}
+</style>
+</head>
+<body>
+
+<!-- ═══ CHARACTER CREATOR ═══════════════════════════════════════════════════ -->
+<div id="creator">
+  <h1>⚔ NOVA WORLD</h1>
+  <p>Choose your class and enter the world</p>
+  <div class="creator-name">
+    <label for="char-name">Name</label>
+    <input id="char-name" type="text" placeholder="Your hero's name..." maxlength="20" value="Hero">
+  </div>
+  <div class="class-grid">
+    <div class="class-card" data-class="warrior">
+      <div class="class-icon">🗡️</div>
+      <div class="class-name">WARRIOR</div>
+      <div class="class-desc">Unstoppable force. High HP and defense, low magic.</div>
+      <div class="class-stats">
+        <div><span>HP</span><span class="val">120</span></div>
+        <div><span>ATK</span><span class="val">15</span></div>
+        <div><span>DEF</span><span class="val">10</span></div>
+        <div><span>MP</span><span class="val">20</span></div>
+      </div>
+    </div>
+    <div class="class-card" data-class="mage">
+      <div class="class-icon">🔮</div>
+      <div class="class-name">MAGE</div>
+      <div class="class-desc">Master of arcane arts. High magic, fragile body.</div>
+      <div class="class-stats">
+        <div><span>HP</span><span class="val">70</span></div>
+        <div><span>ATK</span><span class="val">22</span></div>
+        <div><span>DEF</span><span class="val">4</span></div>
+        <div><span>MP</span><span class="val">100</span></div>
+      </div>
+    </div>
+    <div class="class-card" data-class="rogue">
+      <div class="class-icon">🏹</div>
+      <div class="class-name">ROGUE</div>
+      <div class="class-desc">Swift and deadly. High crit chance, medium defense.</div>
+      <div class="class-stats">
+        <div><span>HP</span><span class="val">90</span></div>
+        <div><span>ATK</span><span class="val">18</span></div>
+        <div><span>DEF</span><span class="val">6</span></div>
+        <div><span>MP</span><span class="val">40</span></div>
+      </div>
+    </div>
+  </div>
+  <button id="btn-enter" disabled>Select a class first</button>
+</div>
+
+<!-- ═══ GAME ═══════════════════════════════════════════════════════════════ -->
+<div id="game">
+  <canvas id="world-canvas"></canvas>
+
+  <div id="hud">
+    <div class="hud-bar"><label>HP</label><div class="bar-bg"><div class="bar-fill bar-hp" id="bar-hp"></div></div><div class="bar-val" id="val-hp">120/120</div></div>
+    <div class="hud-bar"><label>MP</label><div class="bar-bg"><div class="bar-fill bar-mp" id="bar-mp"></div></div><div class="bar-val" id="val-mp">20/20</div></div>
+    <div class="hud-bar"><label>XP</label><div class="bar-bg"><div class="bar-fill bar-xp" id="bar-xp"></div></div><div class="bar-val" id="val-xp">0/100</div></div>
+    <div id="hud-info">
+      Lv <span id="hud-lv">1</span> &nbsp;
+      <span id="hud-class">Warrior</span> &nbsp;
+      💰 <span id="hud-gold">0</span>
+    </div>
+  </div>
+
+  <button id="btn-quests">📜 Quests</button>
+  <div id="quest-panel"><h3>📜 Active Quests</h3><div id="quest-list"></div></div>
+
+  <div id="dialogue">
+    <div id="dialogue-name"></div>
+    <div id="dialogue-text"></div>
+    <div class="dialogue-choices" id="dialogue-choices"></div>
+  </div>
+
+  <div id="combat-log"></div>
+  <div id="minimap"><canvas id="minimap-canvas" width="120" height="120"></canvas></div>
+  <div id="hint">WASD: Move &nbsp;|&nbsp; Click: Attack/Talk &nbsp;|&nbsp; Q: Quests &nbsp;|&nbsp; E: Interact</div>
+  <div id="notif"></div>
+</div>
+
+<script>
+"use strict";
+
+// ══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════════════════
+const TILE  = 40;   // px per tile
+const WORLD = 60;   // world size in tiles
+const VIEW_W = Math.floor(window.innerWidth  / TILE) + 2;
+const VIEW_H = Math.floor(window.innerHeight / TILE) + 2;
+
+const TILE_COLORS = {
+  grass:   '#3d6b3d', forest: '#1a4422', water:  '#1a4488',
+  path:    '#c8a060', village:'#8b7050', mountain:'#6a5a4a',
+  dungeon: '#2a2a3a', dwall:  '#1a1a28', bridge: '#9a7040',
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// WORLD GENERATION
+// ══════════════════════════════════════════════════════════════════════════
+const MAP = Array.from({length: WORLD}, () => Array(WORLD).fill('grass'));
+
+function generateWorld() {
+  const W = WORLD, H = WORLD;
+
+  // Village center (28-34, 27-33)
+  for (let y = 26; y <= 34; y++)
+    for (let x = 26; x <= 34; x++)
+      MAP[y][x] = 'village';
+
+  // Roads
+  for (let y = 0;  y < 26; y++) MAP[y][30] = 'path'; // N road
+  for (let y = 35; y < H;  y++) MAP[y][30] = 'path'; // S road
+  for (let x = 0;  x < 26; x++) MAP[29][x] = 'path'; // W road
+  for (let x = 35; x < W;  x++) MAP[29][x] = 'path'; // E road
+
+  // Diagonal to dungeon
+  for (let i = 0; i < 20; i++) MAP[35+i < H ? 35+i : H-1][35+i < W ? 35+i : W-1] = 'path';
+
+  // Forest NW (0-22, 0-22)
+  for (let y = 0; y < 23; y++)
+    for (let x = 0; x < 23; x++)
+      if (MAP[y][x] === 'grass') MAP[y][x] = Math.random() < 0.65 ? 'forest' : 'grass';
+
+  // Forest North (0-22, 23-37)
+  for (let y = 0; y < 23; y++)
+    for (let x = 23; x < 38; x++)
+      if (MAP[y][x] === 'grass') MAP[y][x] = Math.random() < 0.3 ? 'forest' : 'grass';
+
+  // Mountains NE (38-59, 0-22)
+  for (let y = 0; y < 22; y++)
+    for (let x = 37; x < W; x++)
+      if (MAP[y][x] === 'grass') MAP[y][x] = Math.random() < 0.7 ? 'mountain' : 'grass';
+
+  // Swamp SW (0-22, 37-59)
+  for (let y = 37; y < H; y++)
+    for (let x = 0; x < 23; x++)
+      if (MAP[y][x] === 'grass') MAP[y][x] = Math.random() < 0.5 ? 'water' : 'grass';
+
+  // Dungeon SE
+  for (let y = 48; y < H; y++)
+    for (let x = 48; x < W; x++)
+      MAP[y][x] = 'dungeon';
+  // Dungeon walls border
+  for (let y = 48; y < H; y++) { MAP[y][48] = 'dwall'; MAP[y][W-1] = 'dwall'; }
+  for (let x = 48; x < W; x++) { MAP[48][x] = 'dwall'; MAP[H-1][x] = 'dwall'; }
+  // Inner rooms
+  for (let y = 52; y < 58; y++) { MAP[y][52] = 'dwall'; MAP[y][58] = 'dwall'; }
+  for (let x = 52; x < 58; x++) { MAP[52][x] = 'dwall'; MAP[58][x] = 'dwall'; }
+
+  // River W side
+  for (let y = 5; y < 50; y++) if (MAP[y][18] !== 'path') MAP[y][18] = 'water';
+  for (let y = 5; y < 50; y++) if (MAP[y][19] !== 'path') MAP[y][19] = 'water';
+
+  // Bridge over river
+  MAP[29][18] = 'bridge'; MAP[29][19] = 'bridge';
+}
+generateWorld();
+
+// ══════════════════════════════════════════════════════════════════════════
+// GAME DATA
+// ══════════════════════════════════════════════════════════════════════════
+const CLASSES = {
+  warrior: { name:'Warrior', icon:'🗡️', color:'#c08040',
+    hp:120, mp:20,  atk:15, def:10, agi:8,  critChance:0.08 },
+  mage:    { name:'Mage',    icon:'🔮', color:'#6080f0',
+    hp:70,  mp:100, atk:22, def:4,  agi:10, critChance:0.12 },
+  rogue:   { name:'Rogue',   icon:'🏹', color:'#50c050',
+    hp:90,  mp:40,  atk:18, def:6,  agi:15, critChance:0.25 },
+};
+
+const NPC_DEFS = [
+  { id:'guard',    x:27, y:26, name:'Guard Captain',    color:'#a0a0b0', icon:'⚔',
+    lines:["The wolves in the forest have been attacking farmers. We need a hero!",
+           "Those mountain goblins are getting bolder every day."],
+    questId:'wolves' },
+  { id:'innkeeper',x:31, y:27, name:'Innkeeper Bram',   color:'#c08030', icon:'🍺',
+    lines:["Welcome, traveller! Giant rats have infested my cellar — a nightmare!",
+           "My finest ale for whoever clears those rats."],
+    questId:'rats' },
+  { id:'blacksmith',x:33,y:29, name:'Blacksmith Helga', color:'#808880', icon:'🔨',
+    lines:["I forge the best weapons in three kingdoms.",
+           "Keep your blade sharp and your wits sharper."],
+    questId:null },
+  { id:'elder',    x:29, y:32, name:'Village Elder',    color:'#d4a017', icon:'📜',
+    lines:["Goblins raid our northern farms every new moon.",
+           "Cleanse the mountains of those green menaces!"],
+    questId:'goblins' },
+  { id:'wizard',   x:34, y:32, name:'Old Wizard Mervyn',color:'#a070e0', icon:'🧙',
+    lines:["There is an ancient tome deep within the dungeon.",
+           "Retrieve it and I shall teach you powerful magic."],
+    questId:'tome' },
+];
+
+const QUEST_DEFS = {
+  wolves:  { title:'Wolf Problem',    icon:'🐺', target:'wolf',     count:5, gold:40,  xp:80,  giverName:'Guard Captain',     desc:'Kill 5 wolves in the forest.' },
+  rats:    { title:'Rat Infestation', icon:'🐀', target:'rat',      count:5, gold:30,  xp:60,  giverName:'Innkeeper Bram',    desc:'Kill 5 rats in the dungeon.' },
+  goblins: { title:'Goblin Menace',   icon:'👺', target:'goblin',   count:8, gold:60,  xp:120, giverName:'Village Elder',     desc:'Kill 8 goblins in the mountains.' },
+  tome:    { title:'Ancient Tome',    icon:'📖', target:'skeleton', count:4, gold:80,  xp:160, giverName:'Old Wizard Mervyn', desc:'Defeat 4 skeletons in the dungeon.' },
+};
+
+const MONSTER_TYPES = {
+  wolf:     { name:'Wolf',      hp:30,  maxHp:30,  atk:8,  def:3,  xp:15, gold:3,  color:'#8B5A2B', icon:'🐺', zone:'forest'   },
+  goblin:   { name:'Goblin',    hp:28,  maxHp:28,  atk:10, def:4,  xp:20, gold:5,  color:'#3a8a3a', icon:'👺', zone:'mountain' },
+  rat:      { name:'Rat',       hp:15,  maxHp:15,  atk:5,  def:1,  xp:8,  gold:1,  color:'#8a7060', icon:'🐀', zone:'dungeon'  },
+  skeleton: { name:'Skeleton',  hp:45,  maxHp:45,  atk:13, def:7,  xp:32, gold:8,  color:'#c8c8b0', icon:'💀', zone:'dungeon'  },
+  boss:     { name:'Dungeon Overlord', hp:200, maxHp:200, atk:25, def:15, xp:300, gold:100, color:'#a020a0', icon:'👹', zone:'dungeon' },
+};
+
+const MONSTER_SPAWNS = [
+  // Wolves — forest NW
+  {type:'wolf',    x:8,  y:8},{type:'wolf',  x:12, y:6},{type:'wolf', x:5,  y:15},
+  {type:'wolf',    x:15, y:12},{type:'wolf', x:9,  y:18},{type:'wolf', x:18, y:8},
+  {type:'wolf',    x:7,  y:20},{type:'wolf', x:14, y:20},
+  // Goblins — mountains NE
+  {type:'goblin',  x:42, y:8},{type:'goblin', x:46, y:5},{type:'goblin', x:50, y:10},
+  {type:'goblin',  x:54, y:7},{type:'goblin', x:48, y:15},{type:'goblin', x:52, y:14},
+  {type:'goblin',  x:45, y:18},{type:'goblin',x:57, y:8},
+  // Rats — dungeon entrance
+  {type:'rat',     x:51, y:50},{type:'rat',   x:54, y:51},{type:'rat', x:52, y:54},
+  {type:'rat',     x:55, y:53},{type:'rat',   x:50, y:55},{type:'rat', x:53, y:57},
+  {type:'rat',     x:56, y:50},{type:'rat',   x:49, y:52},
+  // Skeletons — deep dungeon
+  {type:'skeleton',x:53, y:53},{type:'skeleton',x:57, y:55},
+  {type:'skeleton',x:55, y:57},{type:'skeleton',x:58, y:52},
+  // Boss — deepest room
+  {type:'boss',    x:55, y:55},
+];
+
+// ══════════════════════════════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════════════════════════════
+let player = null;
+let npcs    = [];
+let monsters= [];
+let quests  = {}; // questId → { def, kills, done, completed }
+let camX = 0, camY = 0;
+let inDialogue = null;   // current NPC
+let combatTarget = null; // current monster
+let lastAttack = 0;
+let gameRunning = false;
+const keys = {};
+
+function initGame(name, cls) {
+  const c = CLASSES[cls];
+  player = {
+    name, cls, icon: c.icon,
+    x: 30.5, y: 30.5,           // world tile coords (float)
+    hp: c.hp, maxHp: c.hp,
+    mp: c.mp, maxMp: c.mp,
+    atk: c.atk, def: c.def, agi: c.agi, critChance: c.critChance,
+    xp: 0, xpNext: 100, level: 1, gold: 10,
+    color: c.color,
+  };
+  npcs = NPC_DEFS.map(d => ({ ...d }));
+  monsters = MONSTER_SPAWNS.map((s, i) => {
+    const t = MONSTER_TYPES[s.type];
+    return { id: i, type: s.type, x: s.x + 0.5, y: s.y + 0.5,
+      hp: t.hp, maxHp: t.maxHp, atk: t.atk, def: t.def,
+      xp: t.xp, gold: t.gold, color: t.color, icon: t.icon,
+      name: t.name, alive: true, animHit: 0 };
+  });
+  gameRunning = true;
+  camX = player.x - VIEW_W / 2;
+  camY = player.y - VIEW_H / 2;
+  updateHUD();
+  renderMinimap();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// INPUT
+// ══════════════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (!gameRunning) return;
+  if (e.key === 'Escape') { closeDialogue(); }
+  if (e.key.toLowerCase() === 'q') toggleQuestPanel();
+  if (e.key.toLowerCase() === 'e') tryInteract();
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+document.getElementById('world-canvas').addEventListener('click', e => {
+  if (!gameRunning || inDialogue) return;
+  const canvas = e.target;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / TILE + camX;
+  const my = (e.clientY - rect.top)  / TILE + camY;
+  // Check click on monster
+  for (const m of monsters) {
+    if (!m.alive) continue;
+    const dx = m.x - mx, dy = m.y - my;
+    if (dx*dx + dy*dy < 1.2) { startAttack(m); return; }
+  }
+  // Check click on NPC
+  for (const n of npcs) {
+    const dx = n.x - mx, dy = n.y - my;
+    if (dx*dx + dy*dy < 1.5) { openDialogue(n); return; }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// MOVEMENT
+// ══════════════════════════════════════════════════════════════════════════
+function processMovement(dt) {
+  if (inDialogue) return;
+  const speed = 5 * dt;
+  let dx = 0, dy = 0;
+  if (keys['w'] || keys['arrowup'])    dy -= 1;
+  if (keys['s'] || keys['arrowdown'])  dy += 1;
+  if (keys['a'] || keys['arrowleft'])  dx -= 1;
+  if (keys['d'] || keys['arrowright']) dx += 1;
+  if (dx === 0 && dy === 0) return;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  dx /= len; dy /= len;
+  const nx = player.x + dx * speed;
+  const ny = player.y + dy * speed;
+  if (isWalkable(nx, player.y)) player.x = nx;
+  if (isWalkable(player.x, ny)) player.y = ny;
+  // Clamp
+  player.x = Math.max(0.5, Math.min(WORLD - 0.5, player.x));
+  player.y = Math.max(0.5, Math.min(WORLD - 0.5, player.y));
+}
+
+function isWalkable(tx, ty) {
+  const ix = Math.floor(tx), iy = Math.floor(ty);
+  if (ix < 0 || iy < 0 || ix >= WORLD || iy >= WORLD) return false;
+  const t = MAP[iy][ix];
+  if (t === 'water' || t === 'dwall') return false;
+  return true;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMBAT
+// ══════════════════════════════════════════════════════════════════════════
+const ATTACK_COOLDOWN = 800; // ms
+
+function startAttack(monster) {
+  const dx = monster.x - player.x, dy = monster.y - player.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist > 3) { addLog('Too far away!', ''); return; }
+  combatTarget = monster;
+}
+
+function processCombat(now) {
+  if (!combatTarget || !combatTarget.alive) { combatTarget = null; return; }
+  if (now - lastAttack < ATTACK_COOLDOWN) return;
+  lastAttack = now;
+
+  // Player attacks monster
+  const isCrit = Math.random() < player.critChance;
+  const raw = player.atk - combatTarget.def + Math.floor(Math.random() * 5);
+  const dmg = Math.max(1, isCrit ? raw * 2 : raw);
+  combatTarget.hp -= dmg;
+  combatTarget.animHit = 8;
+  spawnFloatText(combatTarget.x, combatTarget.y, `-${dmg}`, isCrit ? '#fd0' : '#f88');
+  addLog(`You hit ${combatTarget.name} for ${dmg}${isCrit ? ' CRIT!':''}`, isCrit ? 'crit':'hit');
+
+  if (combatTarget.hp <= 0) {
+    combatTarget.alive = false;
+    const xpGain   = combatTarget.xp;
+    const goldGain  = combatTarget.gold;
+    player.xp   += xpGain;
+    player.gold += goldGain;
+    addLog(`${combatTarget.name} defeated! +${xpGain} XP, +${goldGain}💰`, 'dead');
+    spawnFloatText(combatTarget.x, combatTarget.y, `+${xpGain}XP`, '#d4a017');
+    checkQuestKill(combatTarget.type);
+    checkLevelUp();
+    combatTarget = null;
+    updateHUD();
+    return;
+  }
+
+  // Monster attacks player
+  const mDmg = Math.max(1, combatTarget.atk - player.def + Math.floor(Math.random()*4));
+  player.hp -= mDmg;
+  spawnFloatText(player.x, player.y, `-${mDmg}`, '#f55');
+  addLog(`${combatTarget.name} hits you for ${mDmg}`, 'hit');
+
+  if (player.hp <= 0) {
+    player.hp = Math.ceil(player.maxHp * 0.5);
+    player.x = 30.5; player.y = 30.5;
+    combatTarget = null;
+    addLog('You were defeated and returned to the village.', 'dead');
+    notify('💀 Defeated! Respawned at village.');
+  }
+  updateHUD();
+}
+
+function checkQuestKill(monsterType) {
+  for (const [qid, q] of Object.entries(quests)) {
+    if (q.done || q.def.target !== monsterType) continue;
+    q.kills++;
+    if (q.kills >= q.def.count) {
+      q.done = true;
+      addLog(`Quest objective complete: ${q.def.title}!`, 'quest');
+      notify(`✅ "${q.def.title}" — objective complete!\nReturn to ${q.def.giverName}.`);
+    }
+    updateQuestPanel();
+  }
+}
+
+function checkLevelUp() {
+  while (player.xp >= player.xpNext) {
+    player.xp     -= player.xpNext;
+    player.level++;
+    player.xpNext  = player.level * 100;
+    player.maxHp  += 15;
+    player.hp      = player.maxHp;
+    player.maxMp  += 8;
+    player.mp      = player.maxMp;
+    player.atk    += 3;
+    player.def    += 2;
+    player.critChance = Math.min(0.5, player.critChance + 0.02);
+    notify(`⬆️ Level Up! Now level ${player.level}\n+15 HP | +3 ATK | +2 DEF`);
+    addLog(`LEVEL UP! Now level ${player.level}.`, 'xp');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// INTERACTION / DIALOGUE
+// ══════════════════════════════════════════════════════════════════════════
+function tryInteract() {
+  if (inDialogue) { closeDialogue(); return; }
+  for (const n of npcs) {
+    const dx = n.x - player.x, dy = n.y - player.y;
+    if (dx*dx + dy*dy < 4) { openDialogue(n); return; }
+  }
+}
+
+function openDialogue(npc) {
+  inDialogue = npc;
+  combatTarget = null;
+  const el = document.getElementById('dialogue');
+  document.getElementById('dialogue-name').textContent = `${npc.icon} ${npc.name}`;
+  const lineIdx = Math.floor(Math.random() * npc.lines.length);
+  document.getElementById('dialogue-text').textContent = npc.lines[lineIdx];
+  const choices = document.getElementById('dialogue-choices');
+  choices.innerHTML = '';
+
+  // Quest choice
+  if (npc.questId) {
+    const q = quests[npc.questId];
+    if (!q) {
+      // Offer quest
+      const qDef = QUEST_DEFS[npc.questId];
+      const btn = makeChoice(`📜 Accept: "${qDef.title}"  (+${qDef.xp} XP, +${qDef.gold}💰)`, () => {
+        acceptQuest(npc.questId, npc);
+      });
+      choices.appendChild(btn);
+    } else if (q.done && !q.completed) {
+      // Turn in quest
+      const btn = makeChoice(`✅ Turn in: "${q.def.title}"`, () => {
+        completeQuest(npc.questId);
+      });
+      choices.appendChild(btn);
+    } else if (q.completed) {
+      const btn = makeChoice(`✅ Quest complete! (Already claimed)`, () => closeDialogue());
+      choices.appendChild(btn);
+    } else {
+      const btn = makeChoice(`🎯 Progress: ${q.kills}/${q.def.count} ${q.def.target}s`, () => closeDialogue());
+      choices.appendChild(btn);
+    }
+  }
+
+  choices.appendChild(makeChoice('Goodbye.', closeDialogue));
+  el.style.display = 'block';
+}
+
+function makeChoice(text, fn) {
+  const btn = document.createElement('button');
+  btn.className = 'dialogue-choice';
+  btn.textContent = text;
+  btn.onclick = fn;
+  return btn;
+}
+
+function closeDialogue() {
+  inDialogue = null;
+  document.getElementById('dialogue').style.display = 'none';
+}
+
+function acceptQuest(qid, npc) {
+  const def = QUEST_DEFS[qid];
+  quests[qid] = { def, kills: 0, done: false, completed: false };
+  addLog(`Accepted quest: "${def.title}"`, 'quest');
+  closeDialogue();
+  updateQuestPanel();
+  notify(`📜 Quest accepted!\n"${def.title}"`);
+}
+
+function completeQuest(qid) {
+  const q = quests[qid];
+  player.xp   += q.def.xp;
+  player.gold += q.def.gold;
+  q.completed = true;
+  checkLevelUp();
+  updateHUD();
+  closeDialogue();
+  updateQuestPanel();
+  addLog(`Quest complete: "${q.def.title}" +${q.def.xp} XP +${q.def.gold}💰`, 'quest');
+  notify(`🎉 Quest complete!\n"${q.def.title}"\n+${q.def.xp} XP | +${q.def.gold}💰`);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════════════════════════
+function updateHUD() {
+  const pct = v => Math.max(0, Math.min(100, v)) + '%';
+  document.getElementById('bar-hp').style.width = pct(player.hp / player.maxHp * 100);
+  document.getElementById('bar-mp').style.width = pct(player.mp / player.maxMp * 100);
+  document.getElementById('bar-xp').style.width = pct(player.xp / player.xpNext * 100);
+  document.getElementById('val-hp').textContent  = `${player.hp}/${player.maxHp}`;
+  document.getElementById('val-mp').textContent  = `${player.mp}/${player.maxMp}`;
+  document.getElementById('val-xp').textContent  = `${player.xp}/${player.xpNext}`;
+  document.getElementById('hud-lv').textContent  = player.level;
+  document.getElementById('hud-class').textContent = CLASSES[player.cls].name;
+  document.getElementById('hud-gold').textContent = player.gold;
+}
+
+function addLog(text, cls) {
+  const log = document.getElementById('combat-log');
+  const el  = document.createElement('div');
+  el.className = `log-line ${cls}`;
+  el.textContent = text;
+  log.prepend(el);
+  while (log.children.length > 5) log.removeChild(log.lastChild);
+}
+
+const floats = [];
+function spawnFloatText(wx, wy, text, color) {
+  floats.push({ wx, wy, text, color, t: 0 });
+}
+
+function toggleQuestPanel() {
+  const p = document.getElementById('quest-panel');
+  const b = document.getElementById('btn-quests');
+  if (p.style.display === 'block') {
+    p.style.display = 'none'; b.style.display = 'block';
+  } else {
+    updateQuestPanel();
+    p.style.display = 'block'; b.style.display = 'none';
+  }
+}
+
+function updateQuestPanel() {
+  const list = document.getElementById('quest-list');
+  list.innerHTML = '';
+  if (Object.keys(quests).length === 0) {
+    list.innerHTML = '<div style="color:#666;font-size:0.75rem">No active quests. Talk to NPCs!</div>';
+    return;
+  }
+  for (const [qid, q] of Object.entries(quests)) {
+    const div = document.createElement('div');
+    div.className = 'quest-item';
+    div.innerHTML = `<div class="quest-title">${q.def.icon} ${q.def.title}</div>
+      <div class="quest-obj ${q.done ? 'quest-done':''}">${q.completed ? '✅ Completed' : q.done ? '✅ Return to '+q.def.giverName : `${q.kills}/${q.def.count} ${q.def.target}s`}</div>`;
+    list.appendChild(div);
+  }
+}
+
+let notifTimer = null;
+function notify(msg) {
+  const el = document.getElementById('notif');
+  el.innerHTML = msg.replace(/\n/g,'<br>');
+  el.style.display = 'block';
+  if (notifTimer) clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => { el.style.display = 'none'; }, 2800);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RENDERER
+// ══════════════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('world-canvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function updateCamera() {
+  const tw = canvas.width  / TILE;
+  const th = canvas.height / TILE;
+  camX = player.x - tw / 2;
+  camY = player.y - th / 2;
+  camX = Math.max(0, Math.min(WORLD - tw, camX));
+  camY = Math.max(0, Math.min(WORLD - th, camY));
+}
+
+function render(now) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const offX = -camX * TILE;
+  const offY = -camY * TILE;
+
+  // ── Tiles ──────────────────────────────────────────────────────────────
+  const startX = Math.max(0, Math.floor(camX));
+  const startY = Math.max(0, Math.floor(camY));
+  const endX   = Math.min(WORLD, Math.ceil(camX + canvas.width  / TILE + 1));
+  const endY   = Math.min(WORLD, Math.ceil(camY + canvas.height / TILE + 1));
+
+  for (let ty = startY; ty < endY; ty++) {
+    for (let tx = startX; tx < endX; tx++) {
+      const t  = MAP[ty][tx];
+      const px = Math.round(tx * TILE + offX);
+      const py = Math.round(ty * TILE + offY);
+      ctx.fillStyle = TILE_COLORS[t] || '#3d6b3d';
+      ctx.fillRect(px, py, TILE + 1, TILE + 1);
+
+      // Tile details
+      if (t === 'forest' && Math.random() < 0.003) {
+        ctx.fillStyle = '#0f2810';
+        ctx.fillRect(px+8, py+4, 24, 28);
+      }
+      if (t === 'mountain') {
+        ctx.fillStyle = '#5a4a3a';
+        ctx.beginPath();
+        ctx.moveTo(px + TILE/2, py + 4);
+        ctx.lineTo(px + TILE - 4, py + TILE - 6);
+        ctx.lineTo(px + 4, py + TILE - 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (t === 'village') {
+        ctx.fillStyle = '#7a6040';
+        ctx.fillRect(px+1, py+1, TILE-2, TILE-2);
+      }
+      if (t === 'water' || t === 'bridge') {
+        const wave = Math.sin(now / 800 + tx * 0.7 + ty * 0.5) * 2;
+        ctx.fillStyle = t === 'bridge' ? '#9a7040' : `rgba(50,120,200,0.3)`;
+        ctx.fillRect(px, py + TILE/2 + wave, TILE, TILE/2);
+      }
+      if (t === 'dungeon') {
+        // Floor pattern
+        ctx.fillStyle = '#252535';
+        ctx.fillRect(px+2, py+2, TILE-4, TILE-4);
+      }
+    }
+  }
+
+  // ── NPCs ───────────────────────────────────────────────────────────────
+  for (const n of npcs) {
+    const px = Math.round((n.x - camX) * TILE);
+    const py = Math.round((n.y - camY) * TILE);
+    if (px < -TILE || py < -TILE || px > canvas.width + TILE || py > canvas.height + TILE) continue;
+
+    // Body
+    ctx.fillStyle = n.color;
+    ctx.beginPath();
+    ctx.arc(px, py, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffcc44';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Icon
+    ctx.font = '16px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.icon, px, py);
+
+    // Name
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillStyle = '#ffcc44';
+    ctx.fillText(n.name.split(' ')[0], px, py - 22);
+
+    // Quest indicator
+    const q = n.questId ? quests[n.questId] : null;
+    if (n.questId && !q) {
+      // Quest available
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillText('!', px, py - 32);
+    } else if (q && q.done && !q.completed) {
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#00ff88';
+      ctx.fillText('?', px, py - 32);
+    }
+  }
+
+  // ── Monsters ───────────────────────────────────────────────────────────
+  for (const m of monsters) {
+    if (!m.alive) continue;
+    const px = Math.round((m.x - camX) * TILE);
+    const py = Math.round((m.y - camY) * TILE);
+    if (px < -TILE || py < -TILE || px > canvas.width + TILE || py > canvas.height + TILE) continue;
+
+    // Hit flash
+    const hitAlpha = m.animHit > 0 ? 1 : 0;
+    if (m.animHit > 0) m.animHit--;
+
+    // Body
+    const rad = m.type === 'boss' ? 18 : 12;
+    ctx.fillStyle = hitAlpha ? '#ffffff' : m.color;
+    ctx.beginPath();
+    ctx.arc(px, py, rad, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#aa2222';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Icon
+    ctx.font = `${m.type === 'boss' ? 20 : 14}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(m.icon, px, py);
+
+    // HP bar
+    const barW = m.type === 'boss' ? 60 : 36;
+    const hpPct = m.hp / m.maxHp;
+    ctx.fillStyle = '#400';
+    ctx.fillRect(px - barW/2, py - rad - 10, barW, 5);
+    ctx.fillStyle = hpPct > 0.5 ? '#4a0' : hpPct > 0.25 ? '#aa0' : '#d20';
+    ctx.fillRect(px - barW/2, py - rad - 10, barW * hpPct, 5);
+
+    // Name
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = '#ffaaaa';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.name, px, py - rad - 14);
+
+    // Target indicator
+    if (combatTarget && combatTarget.id === m.id) {
+      ctx.strokeStyle = '#ff4400';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(px, py, rad + 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // ── Player ─────────────────────────────────────────────────────────────
+  const px = Math.round((player.x - camX) * TILE);
+  const py = Math.round((player.y - camY) * TILE);
+
+  ctx.fillStyle = player.color;
+  ctx.beginPath();
+  ctx.arc(px, py, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.font = '18px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(player.icon, px, py);
+
+  ctx.font = 'bold 10px sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(player.name, px, py - 26);
+
+  // ── Floating texts ──────────────────────────────────────────────────────
+  for (let i = floats.length - 1; i >= 0; i--) {
+    const f = floats[i];
+    f.t += 0.04;
+    const fpx = Math.round((f.wx - camX) * TILE);
+    const fpy = Math.round((f.wy - camY) * TILE) - f.t * 40;
+    ctx.globalAlpha = Math.max(0, 1 - f.t);
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillStyle = f.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(f.text, fpx, fpy);
+    if (f.t >= 1) floats.splice(i, 1);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MINIMAP
+// ══════════════════════════════════════════════════════════════════════════
+const mmCanvas = document.getElementById('minimap-canvas');
+const mmCtx    = mmCanvas.getContext('2d');
+const MM = 2; // pixels per tile
+
+function renderMinimap() {
+  mmCtx.clearRect(0, 0, 120, 120);
+  for (let y = 0; y < WORLD; y++) {
+    for (let x = 0; x < WORLD; x++) {
+      const t = MAP[y][x];
+      mmCtx.fillStyle = TILE_COLORS[t] || '#3d6b3d';
+      mmCtx.fillRect(x * MM, y * MM, MM, MM);
+    }
+  }
+  // NPCs
+  mmCtx.fillStyle = '#ffcc00';
+  for (const n of npcs) mmCtx.fillRect(n.x * MM - 1, n.y * MM - 1, 3, 3);
+  // Monsters (living)
+  mmCtx.fillStyle = '#f44';
+  for (const m of monsters) {
+    if (m.alive) mmCtx.fillRect(m.x * MM - 1, m.y * MM - 1, 2, 2);
+  }
+  // Player
+  mmCtx.fillStyle = '#fff';
+  mmCtx.fillRect(player.x * MM - 2, player.y * MM - 2, 4, 4);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GAME LOOP
+// ══════════════════════════════════════════════════════════════════════════
+let lastTime = 0;
+let minimapTimer = 0;
+
+function gameLoop(now) {
+  if (!gameRunning) { requestAnimationFrame(gameLoop); return; }
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  processMovement(dt);
+  processCombat(now);
+  updateCamera();
+  render(now);
+
+  minimapTimer += dt;
+  if (minimapTimer > 0.5) { renderMinimap(); minimapTimer = 0; }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CHARACTER CREATOR
+// ══════════════════════════════════════════════════════════════════════════
+let selectedClass = null;
+
+document.querySelectorAll('.class-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedClass = card.dataset.class;
+    const btn = document.getElementById('btn-enter');
+    btn.disabled = false;
+    btn.textContent = `Enter as ${CLASSES[selectedClass].name} ⚔`;
+  });
+});
+
+document.getElementById('btn-enter').addEventListener('click', () => {
+  const name = document.getElementById('char-name').value.trim() || 'Hero';
+  document.getElementById('creator').style.display = 'none';
+  document.getElementById('game').style.display    = 'block';
+  initGame(name, selectedClass);
+  requestAnimationFrame(t => { lastTime = t; requestAnimationFrame(gameLoop); });
+  notify(`Welcome, ${name} the ${CLASSES[selectedClass].name}!\nFind the Guard Captain to start your adventure.`);
+});
+
+document.getElementById('btn-quests').addEventListener('click', toggleQuestPanel);
+</script>
+</body>
+</html>
