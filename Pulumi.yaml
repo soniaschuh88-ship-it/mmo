@@ -1,0 +1,7 @@
+name: container-gcp-typescript
+description: A TypeScript program to deploy a containerized service on Google Cloud
+runtime: nodejs
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: tree/HEAD/container-gcp-typescript

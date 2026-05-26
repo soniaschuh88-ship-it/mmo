@@ -1,0 +1,9 @@
+config:
+  container-gcp-typescript:appPath: app
+  container-gcp-typescript:concurrency: "50"
+  container-gcp-typescript:containerPort: "8080"
+  container-gcp-typescript:cpu: "1"
+  container-gcp-typescript:memory: 1Gi
+  gcp:project: ""
+  gcp:region: us-central1
+  pulumi:template: https://github.com/pulumi/templates/tree/head/container-gcp-typescript
