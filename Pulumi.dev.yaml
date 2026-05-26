@@ -1,5 +1,5 @@
 config:
-  container-gcp-typescript:appPath: app
+  container-gcp-typescript:appPath: .
   container-gcp-typescript:concurrency: "50"
   container-gcp-typescript:containerPort: "8080"
   container-gcp-typescript:cpu: "1"
