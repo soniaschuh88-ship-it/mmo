@@ -6,6 +6,7 @@ members = [
     "bifrost/lockstep",
     "bifrost/witness",
     "bifrost/physics",
+    "bifrost/server",
 ]
 
 [workspace.package]
@@ -29,6 +30,14 @@ rand        = "0.8"
 thiserror   = "1"
 uuid        = { version = "1", features = ["v4", "serde"] }
 hex         = "0.4"
+tokio       = { version = "1", features = ["full"] }
+
+# HTTP server
+axum        = { version = "0.7", features = ["ws"] }
+tower       = "0.4"
+tower-http  = { version = "0.5", features = ["cors", "trace"] }
+tracing     = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # WASM compatibility
 getrandom   = { version = "0.2", features = ["js"] }
@@ -39,3 +48,4 @@ bifrost-chunk    = { path = "bifrost/chunk" }
 bifrost-lockstep = { path = "bifrost/lockstep" }
 bifrost-witness  = { path = "bifrost/witness" }
 bifrost-physics  = { path = "bifrost/physics" }
+bifrost-server   = { path = "bifrost/server" }
