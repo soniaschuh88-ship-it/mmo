@@ -1,0 +1,18 @@
+[package]
+name        = "bifrost-witness"
+description = "Witness Quorum Executor — 1 authority + 2 witnesses + N advisory peers"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde         = { workspace = true }
+blake3        = { workspace = true }
+thiserror     = { workspace = true }
+hex           = { workspace = true }
+ed25519-dalek = { workspace = true }
+bifrost-vis      = { workspace = true }
+bifrost-chunk    = { workspace = true }
+bifrost-lockstep = { workspace = true }

@@ -1,0 +1,18 @@
+[package]
+name        = "bifrost-physics"
+description = "Deterministic WASM-compatible physics kernel — identical on browser, desktop, edge"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde       = { workspace = true }
+blake3      = { workspace = true }
+thiserror   = { workspace = true }
+bifrost-vis = { workspace = true }
+
+[lib]
+# Also builds as cdylib for WASM target in a future step
+crate-type = ["lib"]

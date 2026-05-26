@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "bifrost/vis",
+    "bifrost/chunk",
+    "bifrost/lockstep",
+    "bifrost/witness",
+    "bifrost/physics",
+]
+
+[workspace.package]
+version  = "0.1.0"
+edition  = "2021"
+license  = "MIT"
+authors  = ["bKG Contributors"]
+repository = "https://github.com/soniaschuh88-ship-it/mmo"
+
+[workspace.dependencies]
+# Serialization
+serde       = { version = "1",   features = ["derive"] }
+serde_json  = "1"
+
+# Cryptography
+blake3      = "1"
+ed25519-dalek = { version = "2", features = ["serde"] }
+rand        = "0.8"
+
+# Utils
+thiserror   = "1"
+uuid        = { version = "1", features = ["v4", "serde"] }
+hex         = "0.4"
+
+# WASM compatibility
+getrandom   = { version = "0.2", features = ["js"] }
+
+# Internal crates
+bifrost-vis      = { path = "bifrost/vis" }
+bifrost-chunk    = { path = "bifrost/chunk" }
+bifrost-lockstep = { path = "bifrost/lockstep" }
+bifrost-witness  = { path = "bifrost/witness" }
+bifrost-physics  = { path = "bifrost/physics" }
