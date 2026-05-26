@@ -17,7 +17,11 @@ RUN cargo build --release -p bifrost-server
 # ── Stage 2: Node.js gateway + Rust binary ────────────────────────────────────
 FROM node:20-slim
 
+# Run as non-root (better compatibility with Docker rootless)
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /app appuser
+
 WORKDIR /app
+
 
 # Install Node.js dependencies
 COPY app/package*.json ./
@@ -29,8 +33,12 @@ COPY app/ ./
 # Copy compiled Rust binary
 COPY --from=rust-builder /build/target/release/bifrost-server /usr/local/bin/bifrost-server
 
-# Startup script
-RUN chmod +x /app/start.sh
+# Ensure non-root can read/execute everything it needs
+RUN chmod +x /app/start.sh /usr/local/bin/bifrost-server && \
+    chown -R appuser:appuser /app /usr/local/bin/bifrost-server
+
+USER appuser
+
 
 # bifrost-server runs internally on 8081
 # Node.js gateway is exposed on $PORT (Cloud Run default: 8080)

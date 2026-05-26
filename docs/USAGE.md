@@ -203,7 +203,18 @@ curl http://localhost:8080/witness/consensus/0
 
 ---
 
+## Docker
+
+If you hit a `buildx`/`bake` error while building with Compose, see [`docs/DOCKER.md`](docs/DOCKER.md).
+
+### Quick command
+
+```bash
+DOCKER_BUILDKIT=0 docker compose up --build
+```
+
 ## Environment Variables
+
 
 | Variable | Default | Description |
 |---|---|---|

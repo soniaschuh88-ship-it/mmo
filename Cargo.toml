@@ -7,6 +7,7 @@ members = [
     "bifrost/witness",
     "bifrost/physics",
     "bifrost/server",
+    "bifrost/aigm",
 ]
 
 [workspace.package]

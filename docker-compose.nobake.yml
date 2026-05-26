@@ -1,0 +1,14 @@
+# Compose override intended to help environments where Compose/Bake requires buildx.
+# This repo's base docker-compose.yml doesn't define bake settings, so in many cases
+# the fix is simply to run with DOCKER_BUILDKIT=0.
+#
+# Use it like:
+#   DOCKER_BUILDKIT=0 docker compose -f docker-compose.yml -f docker-compose.nobake.yml up --build
+
+services:
+  mmo:
+    build:
+      # Re-declare build config so the override composes cleanly.
+      context: .
+      dockerfile: Dockerfile
+

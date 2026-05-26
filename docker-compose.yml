@@ -1,0 +1,14 @@
+services:
+  mmo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      # gateway listens on 8080 per Dockerfile ENV PORT=8080
+      PORT: 8080
+      # bifrost-server is started by app/start.sh on internal 8081
+      BIFROST_SERVER_URL: http://localhost:8081
+    restart: unless-stopped
+
