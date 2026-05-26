@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::event::{
-    AuthorId, EventPayload, EventType, StoryBeatPayload, WorldEvent,
+    AuthorId, EventPayload, EventType, WorldEvent,
 };
 use crate::npc::dialogue::{DialogueQueue, PendingDialogue};
 use crate::npc::memory::PromptCache;

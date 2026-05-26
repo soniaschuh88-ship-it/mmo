@@ -2,7 +2,7 @@
 name        = "bifrost-vis"
 description = "Voxel Instruction Set — deterministic opcode system for the Bifrost Layer"
 version.workspace    = true
-edition = "2024"
+edition = "2021"
 license.workspace    = true
 authors.workspace    = true
 repository.workspace = true
