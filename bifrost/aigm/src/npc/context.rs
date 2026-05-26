@@ -178,7 +178,7 @@ impl AiContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::npc::memory::MemoryEntry;
+
 
     #[test]
     fn cooldown_enforced() {

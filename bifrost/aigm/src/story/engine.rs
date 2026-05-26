@@ -290,8 +290,8 @@ mod tests {
         );
         engine.add_arc(arc);
 
-        // Reset last_beat_tick to 0 to bypass cooldown for this test
-        engine.last_beat_tick = 0;
+        // Reset last_beat_tick to None to bypass cooldown for this test
+        engine.last_beat_tick = None;
         let beats = engine.tick(0, 1);
         assert!(beats.len() <= 1);
     }

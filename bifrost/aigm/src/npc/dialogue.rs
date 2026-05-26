@@ -408,7 +408,7 @@ impl DialogueQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::npc::memory::ShortTermMemory;
+
 
     fn make_ai_context(npc_id: &str) -> AiContext {
         AiContext::new(npc_id, "llama3-8b", "You are a merchant.", "sell goods")
