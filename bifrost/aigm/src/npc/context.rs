@@ -103,13 +103,20 @@ impl AiContext {
     }
 
     /// True if this NPC may make an LLM call right now.
+    ///
+    /// An NPC that has never spoken (`last_spoken_at_ms == None`) may always
+    /// speak.  After the first call, the cooldown enforces a minimum gap of
+    /// `cooldown_ms` milliseconds between calls.
     pub fn can_speak(&self, now_ms: u64) -> bool {
-        now_ms.saturating_sub(self.last_spoken_at_ms) >= self.cooldown_ms
+        match self.last_spoken_at_ms {
+            None => true,
+            Some(last) => now_ms.saturating_sub(last) >= self.cooldown_ms,
+        }
     }
 
     /// Record that an LLM call was just made.
     pub fn mark_spoken(&mut self, now_ms: u64) {
-        self.last_spoken_at_ms = now_ms;
+        self.last_spoken_at_ms = Some(now_ms);
     }
 
     /// Add a fact to the known-facts list, pruning the oldest if at capacity.
