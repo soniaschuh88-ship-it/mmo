@@ -67,7 +67,9 @@ pub struct AiContext {
     pub known_facts: Vec<String>,
 
     /// Unix-ms timestamp of the last LLM call.
-    pub last_spoken_at_ms: u64,
+    ///
+    /// `None` means the NPC has never spoken — no cooldown applies.
+    pub last_spoken_at_ms: Option<u64>,
 
     /// Minimum ms between LLM calls for this NPC.
     ///
@@ -95,7 +97,7 @@ impl AiContext {
             current_goal:       current_goal.into(),
             mood:               Mood::default(),
             known_facts:        Vec::new(),
-            last_spoken_at_ms:  0,
+            last_spoken_at_ms:  None,
             cooldown_ms:        5_000,
         }
     }
