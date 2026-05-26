@@ -1,5 +1,5 @@
 # ── Stage 1: Build Rust bifrost-server ────────────────────────────────────────
-FROM rust:1.82-slim AS rust-builder
+FROM rust:1-slim AS rust-builder
 
 # Install C linker (needed for linking)
 RUN apt-get update && apt-get install -y --no-install-recommends \
