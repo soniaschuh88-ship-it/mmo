@@ -209,6 +209,25 @@ impl NpcBehavior {
             }
         }
 
+        // Friendly NPC: greet nearest player when they enter greeting range.
+        //
+        // `aggro_range` doubles as "greeting range" for friendly NPCs.
+        // `target_entity_id` tracks the last greeted player so repeated
+        // triggers for the same player are suppressed until they leave range.
+        if self.config.faction == NpcFaction::Friendly {
+            if let Some((pid, dist)) = nearest_player {
+                if dist <= self.config.aggro_range
+                    && self.target_entity_id.as_deref() != Some(pid)
+                {
+                    self.target_entity_id = Some(pid.into());
+                    return BehaviorTransition::PlayerDetected { player_id: pid.into() };
+                }
+            } else {
+                // No player nearby — reset so the next approach triggers again.
+                self.target_entity_id = None;
+            }
+        }
+
         // Patrol if waypoints defined.
         if !self.config.patrol_waypoints.is_empty() && self.state == BehaviorState::Idle {
             self.state = BehaviorState::Patrol;

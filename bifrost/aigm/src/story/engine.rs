@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    arc::{ArcState, StoryArc},
+    arc::StoryArc,
     beat::BeatState,
     mood::WorldMood,
 };
@@ -49,7 +49,9 @@ pub struct StoryEngine {
     pub fired_beats: BTreeSet<String>,
 
     /// Tick at which the last beat fired.
-    last_beat_tick: u64,
+    ///
+    /// `None` means no beat has ever fired — cooldown does not apply.
+    last_beat_tick: Option<u64>,
 }
 
 impl StoryEngine {
@@ -60,7 +62,7 @@ impl StoryEngine {
             completed_quests: BTreeSet::new(),
             dead_npcs:        BTreeSet::new(),
             fired_beats:      BTreeSet::new(),
-            last_beat_tick:   0,
+            last_beat_tick:   None,
         }
     }
 
@@ -89,7 +91,7 @@ impl StoryEngine {
             EventType::AigmStoryBeat => {
                 if let EventPayload::AigmStoryBeat(p) = &event.payload {
                     self.fired_beats.insert(p.beat_id.clone());
-                    self.last_beat_tick = event.seq; // seq used as proxy for tick
+                    self.last_beat_tick = Some(event.seq); // seq used as proxy for tick
                     // Mark the beat in the arc data structure.
                     if let Some(arc) = self.arcs.iter_mut().find(|a| a.arc_id == p.arc_id) {
                         arc.mark_beat_fired(&p.beat_id, event.seq);
@@ -131,10 +133,10 @@ impl StoryEngine {
         active_player_count: u32,
     ) -> Vec<StoryBeatPayload> {
         // Enforce cooldown between beats.
-        if current_tick.saturating_sub(self.last_beat_tick) < BEAT_COOLDOWN_TICKS
-            && self.last_beat_tick != 0
-        {
-            return vec![];
+        if let Some(last) = self.last_beat_tick {
+            if current_tick.saturating_sub(last) < BEAT_COOLDOWN_TICKS {
+                return vec![];
+            }
         }
 
         let mut fired = Vec::new();
@@ -173,7 +175,7 @@ impl StoryEngine {
                     // Mark as ready (will be committed externally).
                     beat.state = BeatState::Ready;
                     self.fired_beats.insert(beat.beat_id.clone());
-                    self.last_beat_tick = current_tick;
+                    self.last_beat_tick = Some(current_tick);
 
                     fired.push(payload);
                     if fired.len() >= MAX_BEATS_PER_TICK {
