@@ -19,11 +19,13 @@
 //! - [`LockstepScheduler`] — drives tick advancement + input aggregation
 
 pub mod barrier;
+pub mod budget;
 pub mod input;
 pub mod scheduler;
 pub mod tick;
 
 pub use barrier::TickBarrier;
+pub use budget::{BudgetError, EventClass, TickBudget, TickUsage, TickUsageHeadroom};
 pub use input::InputBuffer;
 pub use scheduler::{LockstepScheduler, SchedulerError, TickAdvance};
 pub use tick::{CausalOrder, LockstepTick, ZoneId};

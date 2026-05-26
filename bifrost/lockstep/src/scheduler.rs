@@ -18,6 +18,7 @@ use bifrost_chunk::PeerId;
 use bifrost_vis::VoxelProgram;
 
 use crate::barrier::TickBarrier;
+use crate::budget::{BudgetError, TickBudget, TickUsage};
 use crate::input::InputBuffer;
 use crate::tick::{LockstepTick, ZoneId};
 
@@ -31,6 +32,8 @@ pub enum SchedulerError {
     TooFarAhead { seq: u64, current: u64 },
     #[error("submission for seq {0} is in the past")]
     TickInPast(u64),
+    #[error("tick budget exceeded: {0}")]
+    BudgetExceeded(#[from] BudgetError),
 }
 
 /// Produced when the world tick can advance.
@@ -49,6 +52,10 @@ pub struct LockstepScheduler {
     tick_duration_ms: u16,
     barrier:          TickBarrier,
     inputs:           InputBuffer,
+    /// Per-tick budget configuration.
+    pub budget:       TickBudget,
+    /// Accumulated usage for the current tick. Reset on every advance.
+    usage:            TickUsage,
 }
 
 impl LockstepScheduler {
@@ -65,7 +72,15 @@ impl LockstepScheduler {
             tick_duration_ms,
             barrier: TickBarrier::new(),
             inputs:  InputBuffer::new(),
+            budget:  TickBudget::default(),
+            usage:   TickUsage::default(),
         }
+    }
+
+    /// Replace the budget configuration (e.g. production vs. dev limits).
+    pub fn with_budget(mut self, budget: TickBudget) -> Self {
+        self.budget = budget;
+        self
     }
 
     pub fn register_peer(&mut self, peer: PeerId) { self.barrier.register(peer); }
@@ -96,6 +111,8 @@ impl LockstepScheduler {
                 current: self.current_tick.local_seq(),
             });
         }
+        // Budget check — updates usage on accept, rejects with BudgetError otherwise
+        self.usage = self.budget.check_program(&program, &self.usage)?;
         self.inputs.submit(tick, peer, program);
         Ok(())
     }
@@ -116,13 +133,17 @@ impl LockstepScheduler {
         let inputs = self.inputs.get_tick_inputs(completed).cloned().unwrap_or_default();
         self.current_tick = self.current_tick.next();
         self.inputs.evict_before(self.current_tick);
+        // Reset usage counters for the new tick
+        self.usage = TickUsage::default();
         Some(TickAdvance { completed_tick: completed, inputs })
     }
 
-    pub fn current_tick(&self)     -> LockstepTick { self.current_tick }
-    pub fn tick_duration_ms(&self) -> u16          { self.tick_duration_ms }
-    pub fn zone_id(&self)          -> ZoneId       { self.zone_id }
-    pub fn peer_count(&self)       -> usize        { self.barrier.peer_count() }
+    pub fn current_tick(&self)     -> LockstepTick  { self.current_tick }
+    pub fn tick_duration_ms(&self) -> u16           { self.tick_duration_ms }
+    pub fn zone_id(&self)          -> ZoneId        { self.zone_id }
+    pub fn peer_count(&self)       -> usize         { self.barrier.peer_count() }
+    pub fn current_usage(&self)    -> &TickUsage    { &self.usage }
+    pub fn budget(&self)           -> &TickBudget   { &self.budget }
 
     pub fn lagging_peers(&self) -> Vec<PeerId> {
         self.barrier.lagging_peers(self.current_tick)
@@ -139,11 +160,13 @@ mod tests {
 
     fn empty_prog() -> VoxelProgram { VoxelProgram::new() }
 
-    fn prog_set(x: i32) -> VoxelProgram {
+    fn prog_set(n: i32) -> VoxelProgram {
         let mut p = VoxelProgram::new();
-        p.push(1, InstructionPayload::SetVoxel(SetVoxelPayload {
-            position: VoxelCoord::new(x, 0, 0), material: 1,
-        })).unwrap();
+        for x in 0..n {
+            p.push(1, InstructionPayload::SetVoxel(SetVoxelPayload {
+                position: VoxelCoord::new(x, 0, 0), material: 1,
+            })).unwrap();
+        }
         p
     }
 
@@ -230,5 +253,43 @@ mod tests {
         let s = LockstepScheduler::for_zone(ZoneId::new(7), 50);
         assert_eq!(s.current_tick().zone_id(), ZoneId::new(7));
         assert_eq!(s.current_tick().local_seq(), 0);
+    }
+
+    #[test]
+    fn budget_enforced_on_submit() {
+        // Tight budget: max 2 total instructions
+        let mut s = LockstepScheduler::new(50)
+            .with_budget(TickBudget { max_total: 2, max_physics: 100, max_ai: 100, max_programs: 10 });
+        s.register_peer(p(1));
+        // 2 setvoxels: accepted
+        assert!(s.submit_input(p(1), t(0), prog_set(2)).is_ok());
+        // 1 more: rejected — total would be 3 > 2
+        assert!(matches!(
+            s.submit_input(p(1), t(0), prog_set(1)),
+            Err(SchedulerError::BudgetExceeded(_))
+        ));
+    }
+
+    #[test]
+    fn budget_resets_after_advance() {
+        let mut s = LockstepScheduler::new(50)
+            .with_budget(TickBudget { max_total: 2, max_physics: 100, max_ai: 100, max_programs: 10 });
+        s.register_peer(p(1));
+        // Fill budget for tick 0
+        s.submit_input(p(1), t(0), prog_set(2)).unwrap();
+        // Advance to tick 1
+        s.record_ack(p(1), t(0));
+        s.try_advance().unwrap();
+        // Budget reset — can submit again for tick 1
+        assert!(s.submit_input(p(1), t(1), prog_set(2)).is_ok());
+    }
+
+    #[test]
+    fn budget_usage_reported() {
+        let mut s = LockstepScheduler::new(50);
+        s.register_peer(p(1));
+        assert_eq!(s.current_usage().total, 0);
+        s.submit_input(p(1), t(0), prog_set(3)).unwrap();
+        assert_eq!(s.current_usage().total, 3);
     }
 }
