@@ -12,7 +12,7 @@ members = [
 
 [workspace.package]
 version  = "0.1.0"
-edition  = "2021"
+edition  = "2024"
 license  = "MIT"
 authors  = ["bKG Contributors"]
 repository = "https://github.com/soniaschuh88-ship-it/mmo"

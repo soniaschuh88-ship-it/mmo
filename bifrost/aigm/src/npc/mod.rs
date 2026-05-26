@@ -37,4 +37,4 @@ pub use dialogue::{
     DialogueQueue, PendingDialogue,
 };
 pub use memory::{ShortTermMemory, MemoryEntry, PromptCache};
-pub use registry::{NpcState, NpcRegistry};
+pub use registry::{NpcState, NpcRegistry, NpcTickInput};
