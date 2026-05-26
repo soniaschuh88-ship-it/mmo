@@ -59,11 +59,11 @@ impl std::fmt::Display for ConsensusResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Accepted { tick, tick_hash } =>
-                write!(f, "ACCEPTED tick={} hash={}", tick.0, tick_hash.short_hex()),
+                write!(f, "ACCEPTED tick={} hash={}", tick.local_seq(), tick_hash.short_hex()),
             Self::Contested { tick, mismatched_peers, .. } =>
-                write!(f, "CONTESTED tick={} mismatches={}", tick.0, mismatched_peers.len()),
+                write!(f, "CONTESTED tick={} mismatches={}", tick.local_seq(), mismatched_peers.len()),
             Self::Pending { tick, votes_received, votes_required } =>
-                write!(f, "PENDING tick={} {}/{}", tick.0, votes_received, votes_required),
+                write!(f, "PENDING tick={} {}/{}", tick.local_seq(), votes_received, votes_required),
         }
     }
 }
@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn accepted_predicate() {
         let r = ConsensusResult::Accepted {
-            tick: LockstepTick(1),
+            tick: LockstepTick::from_legacy(1),
             tick_hash: TickHash::from_bytes([1u8; 32]),
         };
         assert!(r.is_accepted());
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn display_pending() {
         let r = ConsensusResult::Pending {
-            tick: LockstepTick(5),
+            tick: LockstepTick::from_legacy(5),
             votes_received: 1,
             votes_required: 3,
         };

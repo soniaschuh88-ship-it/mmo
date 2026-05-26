@@ -50,7 +50,8 @@ impl WitnessVote {
         };
         let mut hasher = blake3::Hasher::new();
         hasher.update(self.peer_id.as_bytes());
-        hasher.update(&self.tick.0.to_le_bytes());
+        // Use canonical_bytes() to include zone_id + local_seq + epoch
+        hasher.update(&self.tick.canonical_bytes());
         hasher.update(self.tick_hash.as_bytes());
         hasher.update(&[role_byte]);
         *hasher.finalize().as_bytes()
@@ -84,28 +85,38 @@ mod tests {
     #[test]
     fn payload_hash_deterministic() {
         let v = WitnessVote::unsigned(
-            peer(1), LockstepTick(5), TickHash::from_bytes([0xAAu8; 32]), PeerRole::Authority,
+            peer(1),
+            LockstepTick::from_legacy(5),
+            TickHash::from_bytes([0xAAu8; 32]),
+            PeerRole::Authority,
         );
-        let h1 = v.payload_hash();
-        let h2 = v.payload_hash();
-        assert_eq!(h1, h2);
-        assert_ne!(h1, [0u8; 32]);
+        assert_eq!(v.payload_hash(), v.payload_hash());
+        assert_ne!(v.payload_hash(), [0u8; 32]);
     }
 
     #[test]
     fn different_role_different_hash() {
-        let v_auth = WitnessVote::unsigned(
-            peer(1), LockstepTick(1), TickHash::from_bytes([1u8; 32]), PeerRole::Authority,
-        );
-        let v_wit = WitnessVote::unsigned(
-            peer(1), LockstepTick(1), TickHash::from_bytes([1u8; 32]), PeerRole::Witness,
-        );
+        let t = LockstepTick::from_legacy(1);
+        let v_auth = WitnessVote::unsigned(peer(1), t, TickHash::from_bytes([1u8; 32]), PeerRole::Authority);
+        let v_wit  = WitnessVote::unsigned(peer(1), t, TickHash::from_bytes([1u8; 32]), PeerRole::Witness);
         assert_ne!(v_auth.payload_hash(), v_wit.payload_hash());
     }
 
     #[test]
+    fn different_zone_different_hash() {
+        use bifrost_lockstep::ZoneId;
+        let h = TickHash::from_bytes([1u8; 32]);
+        let t1 = LockstepTick::at(ZoneId::new(1), 5, 0);
+        let t2 = LockstepTick::at(ZoneId::new(2), 5, 0);
+        let v1 = WitnessVote::unsigned(peer(1), t1, h, PeerRole::Witness);
+        let v2 = WitnessVote::unsigned(peer(1), t2, h, PeerRole::Witness);
+        // Same local_seq, same hash, but different zone → different payload hash
+        assert_ne!(v1.payload_hash(), v2.payload_hash());
+    }
+
+    #[test]
     fn unsigned_flag() {
-        let v = WitnessVote::unsigned(peer(1), LockstepTick(0), TickHash::default(), PeerRole::Advisory);
+        let v = WitnessVote::unsigned(peer(1), LockstepTick::zero(), TickHash::default(), PeerRole::Advisory);
         assert!(!v.is_signed());
     }
 }

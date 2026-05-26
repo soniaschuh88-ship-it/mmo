@@ -11,7 +11,9 @@
 //!
 //! ## Key types
 //!
-//! - [`LockstepTick`] — monotonic world tick counter
+//! - [`ZoneId`] — spatial simulation partition identifier
+//! - [`LockstepTick`] — zone-local tick (zone_id + local_seq + epoch)
+//! - [`CausalOrder`] — cross-zone causal comparison result
 //! - [`TickBarrier`] — tracks per-peer acknowledgments
 //! - [`InputBuffer`] — stores per-peer `VoxelProgram`s per tick
 //! - [`LockstepScheduler`] — drives tick advancement + input aggregation
@@ -24,4 +26,4 @@ pub mod tick;
 pub use barrier::TickBarrier;
 pub use input::InputBuffer;
 pub use scheduler::{LockstepScheduler, SchedulerError, TickAdvance};
-pub use tick::LockstepTick;
+pub use tick::{CausalOrder, LockstepTick, ZoneId};

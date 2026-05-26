@@ -97,13 +97,13 @@ impl WitnessExecutor {
         // Reject past committed ticks
         if let Some(last) = self.last_accepted_tick {
             if vote.tick <= last {
-                return Err(VoteError::TickInPast(vote.tick.0));
+                return Err(VoteError::TickInPast(vote.tick.local_seq()));
             }
         }
         // Reject duplicates
         let tick_votes = self.votes.entry(vote.tick).or_default();
         if tick_votes.contains_key(&vote.peer_id) {
-            return Err(VoteError::DuplicateVote(vote.peer_id, vote.tick.0));
+            return Err(VoteError::DuplicateVote(vote.peer_id, vote.tick.local_seq()));
         }
         tick_votes.insert(vote.peer_id, vote);
         Ok(())
@@ -216,7 +216,7 @@ mod tests {
     fn vote(peer_id: PeerId, tick: u64, hash: u8, role: PeerRole) -> WitnessVote {
         WitnessVote::unsigned(
             peer_id,
-            LockstepTick(tick),
+            LockstepTick::from_legacy(tick),
             TickHash::from_bytes([hash; 32]),
             role,
         )
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn pending_before_all_votes() {
         let exec = make_executor();
-        let r = exec.evaluate_consensus(LockstepTick(0));
+        let r = exec.evaluate_consensus(LockstepTick::from_legacy(0));
         assert!(r.is_pending());
     }
 
@@ -239,7 +239,7 @@ mod tests {
         exec.submit_vote(vote(peer(1), 0, 0xAA, PeerRole::Authority)).unwrap();
         exec.submit_vote(vote(peer(2), 0, 0xAA, PeerRole::Witness)).unwrap();
         exec.submit_vote(vote(peer(3), 0, 0xAA, PeerRole::Witness)).unwrap();
-        let r = exec.evaluate_consensus(LockstepTick(0));
+        let r = exec.evaluate_consensus(LockstepTick::from_legacy(0));
         assert!(r.is_accepted());
         if let ConsensusResult::Accepted { tick_hash, .. } = r {
             assert_eq!(tick_hash, TickHash::from_bytes([0xAAu8; 32]));
@@ -252,13 +252,13 @@ mod tests {
         exec.submit_vote(vote(peer(1), 0, 0xAA, PeerRole::Authority)).unwrap();
         exec.submit_vote(vote(peer(2), 0, 0xBB, PeerRole::Witness)).unwrap(); // different!
         exec.submit_vote(vote(peer(3), 0, 0xAA, PeerRole::Witness)).unwrap();
-        let r = exec.evaluate_consensus(LockstepTick(0));
+        let r = exec.evaluate_consensus(LockstepTick::from_legacy(0));
         assert!(r.is_contested());
         if let ConsensusResult::Contested { mismatched_peers, replay_from_tick, .. } = r {
             assert_eq!(mismatched_peers.len(), 1);
             assert_eq!(mismatched_peers[0], peer(2));
             // No prior accepted tick → replay from 0
-            assert_eq!(replay_from_tick, LockstepTick(0));
+            assert_eq!(replay_from_tick, LockstepTick::from_legacy(0));
         }
     }
 
@@ -266,14 +266,16 @@ mod tests {
     fn replay_from_last_accepted() {
         let mut exec = make_executor();
         // Commit tick 5 as accepted
-        exec.last_accepted_tick = Some(LockstepTick(5));
+        exec.last_accepted_tick = Some(LockstepTick::from_legacy(5));
         exec.submit_vote(vote(peer(1), 6, 0xAA, PeerRole::Authority)).unwrap();
         exec.submit_vote(vote(peer(2), 6, 0xBB, PeerRole::Witness)).unwrap(); // mismatch
         exec.submit_vote(vote(peer(3), 6, 0xAA, PeerRole::Witness)).unwrap();
-        let r = exec.evaluate_consensus(LockstepTick(6));
+        let r = exec.evaluate_consensus(LockstepTick::from_legacy(6));
         if let ConsensusResult::Contested { replay_from_tick, .. } = r {
-            // last_accepted = 5, so replay from 6 (= 5.next())
-            assert_eq!(replay_from_tick, LockstepTick(6));
+            // last_accepted = 5 → replay_from = 5.next() → local_seq = 6
+            // epoch comes from the prior tick's .next(), not from_legacy(6)
+            assert_eq!(replay_from_tick.local_seq(), 6);
+            assert_eq!(replay_from_tick.zone_id(), LockstepTick::from_legacy(5).zone_id());
         }
     }
 
@@ -297,10 +299,10 @@ mod tests {
         exec.submit_vote(vote(peer(1), 0, 0xAA, PeerRole::Authority)).unwrap();
         exec.submit_vote(vote(peer(2), 0, 0xAA, PeerRole::Witness)).unwrap();
         exec.submit_vote(vote(peer(3), 0, 0xAA, PeerRole::Witness)).unwrap();
-        exec.commit_tick(LockstepTick(0));
+        exec.commit_tick(LockstepTick::from_legacy(0));
         // After commit, tick 0 votes should be evicted
-        assert!(exec.votes.get(&LockstepTick(0)).is_none());
-        assert_eq!(exec.last_accepted_tick(), Some(LockstepTick(0)));
+        assert!(exec.votes.get(&LockstepTick::from_legacy(0)).is_none());
+        assert_eq!(exec.last_accepted_tick(), Some(LockstepTick::from_legacy(0)));
     }
 
     #[test]
@@ -309,6 +311,6 @@ mod tests {
         // Advisory peer (4) can vote without error
         exec.submit_vote(vote(peer(4), 0, 0xAA, PeerRole::Advisory)).unwrap();
         // But quorum is still pending without core votes
-        assert!(exec.evaluate_consensus(LockstepTick(0)).is_pending());
+        assert!(exec.evaluate_consensus(LockstepTick::from_legacy(0)).is_pending());
     }
 }

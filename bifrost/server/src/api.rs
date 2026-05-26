@@ -127,7 +127,7 @@ pub async fn demo() -> Json<DemoResult> {
     ));
 
     // 4. Submit identical witness votes (simulates full agreement)
-    let tick      = LockstepTick(0);
+    let tick      = LockstepTick::from_legacy(0);
     let tick_hash = TickHash::from_bytes(result.state_hash);
     exec.submit_vote(WitnessVote::unsigned(authority, tick, tick_hash, PeerRole::Authority)).unwrap();
     exec.submit_vote(WitnessVote::unsigned(witness1,  tick, tick_hash, PeerRole::Witness)).unwrap();
@@ -149,7 +149,7 @@ pub async fn demo() -> Json<DemoResult> {
     sched.record_ack(witness2, tick);
     let advance = sched.try_advance();
     let tick_advanced = advance.is_some();
-    steps.push(format!("tick advanced: {} → new_tick={}", tick_advanced, sched.current_tick().0));
+    steps.push(format!("tick advanced: {} → new_tick={}", tick_advanced, sched.current_tick().local_seq()));
 
     Json(DemoResult {
         peers: 3,
@@ -159,7 +159,7 @@ pub async fn demo() -> Json<DemoResult> {
         state_hash:    hex::encode(result.state_hash),
         consensus:     consensus_str,
         tick_advanced,
-        new_tick:      sched.current_tick().0,
+        new_tick:      sched.current_tick().local_seq(),
         steps,
     })
 }
@@ -214,7 +214,7 @@ pub async fn get_tick(State(shared): State<SharedState>) -> Json<TickResp> {
         .map(|p| hex::encode(p.as_bytes()))
         .collect();
     Json(TickResp {
-        current_tick:  s.scheduler.current_tick().0,
+        current_tick:  s.scheduler.current_tick().local_seq(),
         lagging_peers: lagging,
     })
 }
@@ -227,7 +227,7 @@ pub async fn submit_input(
         Ok(p)  => p,
         Err(e) => return bad!(e),
     };
-    let tick = LockstepTick(req.tick);
+    let tick = LockstepTick::from_legacy(req.tick);
 
     // Build VoxelProgram from raw instructions
     let mut program = VoxelProgram::new();
@@ -267,7 +267,7 @@ pub async fn ack_tick(
         Err(e) => return bad!(e),
     };
     let mut s = shared.lock().await;
-    s.scheduler.record_ack(peer, LockstepTick(req.tick));
+    s.scheduler.record_ack(peer, LockstepTick::from_legacy(req.tick));
     Json(json!({ "acked": true, "peer_id": req.peer_id, "tick": req.tick })).into_response()
 }
 
@@ -282,7 +282,7 @@ pub async fn advance_tick(State(shared): State<SharedState>) -> impl IntoRespons
         None => {
             (StatusCode::ACCEPTED, Json(AdvanceResp {
                 advanced:             false,
-                current_tick:         current.0,
+                current_tick:         current.local_seq(),
                 completed_tick:       None,
                 state_hash:           hex::encode(s.world.state_hash()),
                 instructions_executed: 0,
@@ -300,8 +300,8 @@ pub async fn advance_tick(State(shared): State<SharedState>) -> impl IntoRespons
             let state_hash = hex::encode(s.world.state_hash());
             Json(AdvanceResp {
                 advanced:             true,
-                current_tick:         s.scheduler.current_tick().0,
-                completed_tick:       Some(adv.completed_tick.0),
+                current_tick:         s.scheduler.current_tick().local_seq(),
+                completed_tick:       Some(adv.completed_tick.local_seq()),
                 state_hash,
                 instructions_executed: instr_total,
             }).into_response()
@@ -393,7 +393,7 @@ pub async fn submit_witness_vote(
         "advisory"  => PeerRole::Advisory,
         other       => return bad!(format!("unknown role: {other}")),
     };
-    let vote = WitnessVote::unsigned(peer, LockstepTick(req.tick), TickHash::from_bytes(hash_arr), role);
+    let vote = WitnessVote::unsigned(peer, LockstepTick::from_legacy(req.tick), TickHash::from_bytes(hash_arr), role);
     let mut s = shared.lock().await;
     match &mut s.witness {
         None       => bad!("witness executor not configured; call POST /witness/setup first"),
@@ -408,7 +408,7 @@ pub async fn get_consensus(
     State(shared): State<SharedState>,
     Path(tick_num): Path<u64>,
 ) -> impl IntoResponse {
-    let tick = LockstepTick(tick_num);
+    let tick = LockstepTick::from_legacy(tick_num);
     let s = shared.lock().await;
     match &s.witness {
         None => bad!("witness executor not configured; call POST /witness/setup first"),
@@ -426,7 +426,7 @@ pub async fn get_consensus(
                     json!({
                         "authority_hash":   hex::encode(authority_hash.as_bytes()),
                         "mismatched_peers": mismatched_peers.iter().map(|p| hex::encode(p.as_bytes())).collect::<Vec<_>>(),
-                        "replay_from_tick": replay_from_tick.0,
+                        "replay_from_tick": replay_from_tick.local_seq(),
                     }),
                 ),
                 ConsensusResult::Pending { votes_received, votes_required, .. } => (
