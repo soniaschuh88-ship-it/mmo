@@ -151,6 +151,11 @@ body{background:#05050e;color:#e0d8c8;font-family:'Segoe UI',monospace;overflow:
     <div class="bar-row"><span class="bar-lbl">MP</span><div class="bar-bg"><div class="bar-fill bar-mp" id="b-mp"></div></div><div class="bar-val" id="v-mp"></div></div>
     <div class="bar-row"><span class="bar-lbl">XP</span><div class="bar-bg"><div class="bar-fill bar-xp" id="b-xp"></div></div><div class="bar-val" id="v-xp"></div></div>
     <div id="hud-info">Lv <span id="h-lv">1</span> &nbsp;<span id="h-cls"></span> &nbsp;💰<span id="h-gold">0</span><span id="sp-pill">0 SP</span></div>
+    <div id="equip-row" style="display:flex;gap:5px;margin-top:4px;font-size:1.1rem">
+      <span id="eq-wpn" title="weapon" style="cursor:help;opacity:.7">·</span>
+      <span id="eq-arm" title="armor"  style="cursor:help;opacity:.7">·</span>
+      <span id="eq-acc" title="acc"    style="cursor:help;opacity:.7">·</span>
+    </div>
   </div>
   <div id="zone-label"></div>
   <div id="g-btns">
@@ -433,6 +438,153 @@ const QCHAINS={
 };
 
 // ═══════════════════════════════════════════════════════════════════
+// ITEMS + DROPS
+// ═══════════════════════════════════════════════════════════════════
+const ITEMS={
+  // Weapons
+  iron_sword:   {name:'Iron Sword',   icon:'🗡️',type:'weapon',slot:'wpn',atk:8, desc:'A reliable iron blade.'},
+  steel_sword:  {name:'Steel Sword',  icon:'⚔', type:'weapon',slot:'wpn',atk:14,desc:'Forged from quality steel.'},
+  mage_staff:   {name:'Mage Staff',   icon:'🔮',type:'weapon',slot:'wpn',atk:12,desc:'Channels arcane power.'},
+  rogue_blade:  {name:'Shadow Blade', icon:'🔪',type:'weapon',slot:'wpn',atk:11,crit:.08,desc:'Strikes from darkness.'},
+  bone_sword:   {name:'Bone Sword',   icon:'💀',type:'weapon',slot:'wpn',atk:16,desc:'Carved from ancient bone.'},
+  obsidian_spear:{name:'Obsidian Spear',icon:'⚡',type:'weapon',slot:'wpn',atk:20,desc:'Volcanic obsidian edge.'},
+  // Armor
+  leather_vest: {name:'Leather Vest', icon:'🧥',type:'armor',slot:'arm',def:4,  desc:'Basic protection.'},
+  chain_mail:   {name:'Chain Mail',   icon:'🔗',type:'armor',slot:'arm',def:8,  desc:'Interlocked iron rings.'},
+  crystal_plate:{name:'Crystal Plate',icon:'💎',type:'armor',slot:'arm',def:12, desc:'Hardened crystal armor.'},
+  shadow_cloak: {name:'Shadow Cloak', icon:'🌑',type:'armor',slot:'arm',def:5,dodge:.1,desc:'Woven from darkness.'},
+  // Accessories
+  wolf_fang:    {name:'Wolf Fang',    icon:'🦷',type:'acc',slot:'acc',atk:3,   desc:'From a great wolf.'},
+  goblin_totem: {name:'Goblin Totem', icon:'🪆',type:'acc',slot:'acc',crit:.05,desc:'Tribal good-luck charm.'},
+  skull_ring:   {name:'Skull Ring',   icon:'💍',type:'acc',slot:'acc',def:3,hp:20,desc:'From the dungeon deep.'},
+  // Potions
+  health_pot:   {name:'Health Potion',icon:'🧪',type:'potion',hp:60, desc:'Restore 60 HP.'},
+  mega_pot:     {name:'Mega Potion',  icon:'⚗️',type:'potion',hp:120,desc:'Restore 120 HP.'},
+  mana_pot:     {name:'Mana Potion',  icon:'💙',type:'potion',mp:50, desc:'Restore 50 MP.'},
+  elixir:       {name:'Elixir',       icon:'🔮',type:'potion',hp:80,mp:40,desc:'Restores HP and MP.'},
+};
+const DROPS={
+  wolf:       [{id:'wolf_fang',chance:.35},{id:'health_pot',chance:.25},{id:'leather_vest',chance:.08}],
+  goblin:     [{id:'goblin_totem',chance:.30},{id:'health_pot',chance:.30},{id:'iron_sword',chance:.10}],
+  spider:     [{id:'health_pot',chance:.20},{id:'shadow_cloak',chance:.06}],
+  skeleton:   [{id:'bone_sword',chance:.25},{id:'chain_mail',chance:.12},{id:'skull_ring',chance:.08}],
+  rat:        [{id:'health_pot',chance:.15}],
+  troll:      [{id:'steel_sword',chance:.20},{id:'chain_mail',chance:.15},{id:'elixir',chance:.10}],
+  elemental:  [{id:'obsidian_spear',chance:.18},{id:'mana_pot',chance:.30},{id:'crystal_plate',chance:.10}],
+  goblin_chief:[{id:'steel_sword',chance:.90},{id:'crystal_plate',chance:.60},{id:'mega_pot',chance:.80}],
+  lich:       [{id:'obsidian_spear',chance:.95},{id:'crystal_plate',chance:.90},{id:'elixir',chance:.95}],
+};
+
+// Ground items (dropped, can be picked up)
+let groundItems=[];
+
+function rollDrops(type,wx,wy){
+  const table=DROPS[type];if(!table)return;
+  for(const entry of table){
+    if(Math.random()<entry.chance){
+      const ox=(Math.random()-.5)*1.5;
+      const oz=(Math.random()-.5)*1.5;
+      groundItems.push({id:entry.id,wx:wx+ox,wy:wy+oz,item:ITEMS[entry.id]});
+    }
+  }
+}
+
+function checkPickup(){
+  for(let i=groundItems.length-1;i>=0;i--){
+    const g=groundItems[i];
+    const dx=g.wx-P.wx,dy=g.wy-P.wy;
+    if(dx*dx+dy*dy<1.2){
+      pickupItem(g.item,g.id);
+      groundItems.splice(i,1);
+    }
+  }
+}
+
+let inventory=[];
+let equipped={wpn:null,arm:null,acc:null};
+
+function pickupItem(item,id){
+  if(item.type==='potion'){
+    if(item.hp){const gain=Math.min(item.hp,P.maxHp-P.hp);P.hp+=gain;spawnFloat(P.wx,P.wy,`+${gain}HP`,'#4fc');}
+    if(item.mp){const gain=Math.min(item.mp,P.maxMp-P.mp);P.mp+=gain;spawnFloat(P.wx,P.wy,`+${gain}MP`,'#4af');}
+    log(`Picked up ${item.icon} ${item.name}`,'c-heal');updateHUD();
+  }else{
+    // Auto-equip if better
+    const slot=item.slot;
+    const cur=equipped[slot]?ITEMS[equipped[slot]]:null;
+    const curStat=cur?((cur.atk||0)+(cur.def||0)):0;
+    const newStat=(item.atk||0)+(item.def||0);
+    if(!cur||newStat>curStat){
+      unequip(slot);equipped[slot]=id;applyItemBonus(item,1);
+      log(`Equipped ${item.icon} ${item.name}`,'c-xp');
+    }else{
+      inventory.push(id);
+      log(`Picked up ${item.icon} ${item.name}`,'');
+    }
+    updateEquipDisplay();updateHUD();
+  }
+}
+
+function unequip(slot){
+  if(!equipped[slot])return;
+  const item=ITEMS[equipped[slot]];if(!item)return;
+  applyItemBonus(item,-1);equipped[slot]=null;
+}
+function applyItemBonus(item,sign){
+  if(item.atk)P.atk+=item.atk*sign;
+  if(item.def)P.def+=item.def*sign;
+  if(item.crit)P.crit=Math.max(.05,P.crit+item.crit*sign);
+  if(item.dodge)P.dodge=Math.max(0,P.dodge+item.dodge*sign);
+  if(item.hp){P.maxHp+=item.hp*sign;if(sign>0)P.hp=Math.min(P.hp+item.hp,P.maxHp);}
+}
+function updateEquipDisplay(){
+  const ids=['eq-wpn','eq-arm','eq-acc'];
+  const slots=['wpn','arm','acc'];
+  for(let i=0;i<3;i++){
+    const el=document.getElementById(ids[i]);if(!el)continue;
+    const id=equipped[slots[i]];
+    if(id&&ITEMS[id]){el.textContent=ITEMS[id].icon;el.title=ITEMS[id].name+': '+ITEMS[id].desc;}
+    else{el.textContent='·';el.title=slots[i];}
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MONSTER AI
+// ═══════════════════════════════════════════════════════════════════
+const AI_AGGRO_RANGE=5.5;
+const AI_PATROL_RANGE=4;
+let aiTimer=0;
+
+function updateMonsterAI(dt,now){
+  aiTimer+=dt;if(aiTimer<.3)return;aiTimer=0;
+  if(!P)return;
+  for(const m of monsters){
+    if(!m.alive)continue;
+    const dx=m.wx-P.wx,dy=m.wy-P.wy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    // Aggro: move toward player if in range
+    if(dist<AI_AGGRO_RANGE&&dist>.8){
+      const spd=(m.boss?1.2:0.8)*.3;
+      const nx=m.wx-dx/dist*spd;
+      const ny=m.wy-dy/dist*spd;
+      if(BM[Math.max(0,Math.min(W-1,Math.floor(ny)))]?.[Math.max(0,Math.min(W-1,Math.floor(nx)))]!==BIOME.GD&&
+         BM[Math.max(0,Math.min(W-1,Math.floor(ny)))]?.[Math.max(0,Math.min(W-1,Math.floor(nx)))]!==BIOME.WA){
+        m.wx=Math.max(.5,Math.min(W-.5,nx));
+        m.wy=Math.max(.5,Math.min(W-.5,ny));
+        m.moving=true;m.facing=dx<0?2:3;
+      }
+    }else{
+      // Patrol: small random wander
+      if(Math.random()<.1){
+        const ang=Math.random()*Math.PI*2;
+        m.wx=Math.max(.5,Math.min(W-.5,m.wx+Math.cos(ang)*.4));
+        m.wy=Math.max(.5,Math.min(W-.5,m.wy+Math.sin(ang)*.4));
+      }
+      m.moving=false;
+    }
+  }
+}
+
 // CLASSES + SKILLS
 // ═══════════════════════════════════════════════════════════════════
 const CLASSES={
@@ -509,6 +661,7 @@ function initGame(name,cls){
     anim:'idle',animF:0,animT:0,facing:0,moving:false,
   };
   skillsU={};hotbar=[null,null,null,null];
+  inventory=[];groundItems=[];equipped={wpn:null,arm:null,acc:null};
   npcs=[...spNPC];
   monsters=spMon.map(m=>({...m,hp:m.maxHp,alive:true,animHit:0,stunUntil:0,missCount:0,
     anim:'idle',animF:0,animT:0,facing:0,moving:false}));
@@ -883,6 +1036,36 @@ function render(now){
     }
   }
 
+  // Ground items
+  for(const g of groundItems){
+    const{sx,sy}=w2s(g.wx,g.wy,tileH(g.wx,g.wy));
+    if(sx<-30||sx>CW+30||sy<-30||sy>CH+30)continue;
+    // Pulsing glow
+    const pulse=0.6+0.4*Math.sin(now*.004+g.wx*.5);
+    ctx.globalAlpha=pulse;
+    ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(g.item.icon,sx,sy-12);
+    ctx.globalAlpha=1;
+    // Sparkle ring
+    ctx.strokeStyle=`rgba(255,220,60,${pulse*.5})`;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(sx,sy-12,14,0,Math.PI*2);ctx.stroke();ctx.lineWidth=1;
+  }
+
+  // Boss HP bar (centered, large)
+  const boss=monsters.find(m=>m.alive&&m.boss);
+  if(boss){
+    const bw=320,bx=CW/2-bw/2,by=60;
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(bx-4,by-20,bw+8,44);
+    ctx.strokeStyle='#a020a0';ctx.lineWidth=2;ctx.strokeRect(bx-4,by-20,bw+8,44);ctx.lineWidth=1;
+    ctx.fillStyle='#400';ctx.fillRect(bx,by,bw,16);
+    const pct=Math.max(0,boss.hp/boss.maxHp);
+    const bc=pct>.5?'#9020c0':pct>.25?'#d04000':'#ff0000';
+    ctx.fillStyle=bc;ctx.fillRect(bx,by,bw*pct,16);
+    ctx.font='bold 11px sans-serif';ctx.fillStyle='#fff';ctx.textAlign='center';
+    ctx.fillText(`${boss.icon} ${boss.name}  ${boss.hp}/${boss.maxHp}`,CW/2,by+12);
+    ctx.fillText(`⚠ BOSS`,CW/2,by-7);
+  }
+
   // Particles
   for(let i=FLOATS.length-1;i>=0;i--){
     const f=FLOATS[i];f.t+=.04;
@@ -1064,9 +1247,13 @@ function doAtk(m,mult,ignDef,now,partType='hit'){
 function onKill(m){
   P.xp+=m.xp;P.gold+=m.gold;
   if(P.onKill>0){P.hp=Math.min(P.maxHp,P.hp+P.onKill);}
-  spawnParticles(m.wx,m.wy,10,'#d4a017','exp');
+  spawnParticles(m.wx,m.wy,14,'#d4a017','exp');
   spawnFloat(m.wx,m.wy,`+${m.xp}XP`,'#d4a017');
   log(`${m.name} slain! +${m.xp}XP +${m.gold}💰`,'c-dead');
+  // Boss notification
+  if(m.boss)notify(`👑 BOSS DEFEATED!\n${m.name} has fallen!\n+${m.xp}XP +${m.gold}💰`);
+  // Item drops
+  rollDrops(m.type,m.wx,m.wy);
   checkQuestKill(m.type);checkLevel();
   target=null;updateHUD();
 }
@@ -1371,7 +1558,9 @@ let lastT=0,mmTimer=0;
 function loop(now){
   if(!P){requestAnimationFrame(loop);return;}
   const dt=Math.min((now-lastT)/1000,.05);lastT=now;
-  processMove(dt,now);processCombat(now);updateCamera();
+  processMove(dt,now);processCombat(now);
+  updateMonsterAI(dt,now);checkPickup();
+  updateCamera();
   render(now);drawDayNight(now);
   mmTimer+=dt;if(mmTimer>.4){renderMinimap();mmTimer=0;}
   updateHotbarCDs(now);
