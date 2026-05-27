@@ -7,6 +7,7 @@ pub mod story;
 pub mod npcs;
 pub mod quests;
 pub mod loot;
+pub mod wac;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Section {
@@ -16,6 +17,7 @@ pub enum Section {
     Npcs,
     Quests,
     Loot,
+    Wac,
 }
 
 impl Section {
@@ -27,6 +29,7 @@ impl Section {
             Section::Npcs   => "🧙 NPCs",
             Section::Quests => "📜 Quests",
             Section::Loot   => "💎 Loot",
+            Section::Wac    => "⚡ WAC",
         }
     }
 }
@@ -40,6 +43,7 @@ pub fn app() -> Html {
         [
             Section::World, Section::Biomes, Section::Story,
             Section::Npcs,  Section::Quests, Section::Loot,
+            Section::Wac,
         ]
         .iter()
         .map(|&s| {
@@ -64,6 +68,7 @@ pub fn app() -> Html {
         Section::Npcs   => html! { <npcs::NpcsSection /> },
         Section::Quests => html! { <quests::QuestsSection /> },
         Section::Loot   => html! { <loot::LootSection /> },
+        Section::Wac    => html! { <wac::WacSection /> },
     };
 
     html! {

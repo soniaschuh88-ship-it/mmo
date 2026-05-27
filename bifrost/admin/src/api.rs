@@ -188,3 +188,47 @@ pub async fn update_item(i: &LootItem) -> Result<LootItem, String> {
 pub async fn delete_item(id: &str) -> Result<(), String> {
     delete(&format!("{BASE}/loot/items/{id}")).await
 }
+
+// ─── WAC — World Asset Compiler ──────────────────────────────────────────────
+
+const WAC_BASE: &str = "/api/wac";
+
+/// POST /api/wac/compile  →  proxied to bifrost-server.
+pub async fn wac_compile(req: &crate::types::WacRequest) -> Result<serde_json::Value, String> {
+    let body = serde_json::to_string(req).map_err(|e| e.to_string())?;
+    let resp = gloo_net::http::Request::post(&format!("{WAC_BASE}/compile"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .map_err(|e| e.to_string())?
+        .send().await
+        .map_err(|e| e.to_string())?;
+    resp.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+}
+
+/// POST /api/wac/director/tick  →  run World Director against a pressure graph.
+pub async fn director_tick(req: &crate::types::PressureGraphRequest) -> Result<serde_json::Value, String> {
+    let body = serde_json::to_string(req).map_err(|e| e.to_string())?;
+    let resp = gloo_net::http::Request::post(&format!("{WAC_BASE}/director/tick"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .map_err(|e| e.to_string())?
+        .send().await
+        .map_err(|e| e.to_string())?;
+    resp.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+}
+
+/// GET /api/wac/director/history  →  recent director decisions.
+pub async fn director_history() -> Result<serde_json::Value, String> {
+    let resp = gloo_net::http::Request::get(&format!("{WAC_BASE}/director/history"))
+        .send().await
+        .map_err(|e| e.to_string())?;
+    resp.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+}
+
+/// GET /api/wac/cache  →  cache statistics.
+pub async fn wac_cache_stats() -> Result<serde_json::Value, String> {
+    let resp = gloo_net::http::Request::get(&format!("{WAC_BASE}/cache"))
+        .send().await
+        .map_err(|e| e.to_string())?;
+    resp.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+}

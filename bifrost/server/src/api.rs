@@ -15,6 +15,11 @@ use bifrost_vis::{InstructionPayload, VoxelInstruction, VoxelProgram};
 use bifrost_witness::{
     ConsensusResult, PeerRole, TickHash, WitnessExecutor, WitnessVote,
 };
+use bifrost_wac::{
+    AssetBlueprint, PressureGraph,
+    compile, validate,
+    cache::semantic_hash_with_seed,
+};
 
 use crate::models::*;
 use crate::state::SharedState;
@@ -438,4 +443,102 @@ pub async fn get_consensus(
             Json(ConsensusResp { tick: tick_num, result: result_str, hash, details }).into_response()
         }
     }
+}
+
+// ─── WAC — World Asset Compiler ───────────────────────────────────────────────
+
+/// Validate and compile an [`AssetBlueprint`] to [`AssetIR`].
+///
+/// The compiled result is stored in the in-memory [`AssetCache`] for
+/// subsequent retrieval by semantic hash.
+///
+/// # Errors
+/// - 400 if the blueprint fails validation.
+/// - 422 if the compiler cannot process the spec.
+pub async fn wac_compile(
+    State(shared): State<SharedState>,
+    Json(bp): Json<AssetBlueprint>,
+) -> impl IntoResponse {
+    // Validate first (cheap).
+    if let Err(e) = validate(&bp) {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))).into_response();
+    }
+
+    // Compile (deterministic).
+    match compile(&bp) {
+        Ok(ir) => {
+            let key_hex = hex::encode(semantic_hash_with_seed(&bp));
+            let mut s = shared.lock().await;
+            s.asset_cache.insert(&bp, ir.clone());
+            Json(json!({
+                "ok":          true,
+                "blueprint_id": ir.blueprint_id.to_string(),
+                "ir_version":   ir.ir_version,
+                "semantic_hash": key_hex,
+                "asset":         ir.asset,
+            })).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY,
+                   Json(json!({ "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// Look up a previously compiled asset by its 64-char hex semantic hash.
+pub async fn wac_cache_get(
+    State(shared): State<SharedState>,
+    Path(hash_hex): Path<String>,
+) -> impl IntoResponse {
+    let bytes = match hex::decode(&hash_hex) {
+        Ok(b) => b,
+        Err(_) => return (StatusCode::BAD_REQUEST,
+                          Json(json!({ "error": "invalid hex hash" }))).into_response(),
+    };
+    let key: [u8; 32] = match bytes.try_into() {
+        Ok(k) => k,
+        Err(_) => return (StatusCode::BAD_REQUEST,
+                          Json(json!({ "error": "hash must be 32 bytes (64 hex chars)" }))).into_response(),
+    };
+    let s = shared.lock().await;
+    match s.asset_cache.get_by_key(&key) {
+        Some(ir) => Json(ir).into_response(),
+        None     => (StatusCode::NOT_FOUND, Json(json!({ "error": "not in cache" }))).into_response(),
+    }
+}
+
+/// Return WAC cache statistics.
+pub async fn wac_cache_stats(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    Json(json!({
+        "entries": s.asset_cache.len(),
+        "capacity": bifrost_wac::cache::CACHE_CAPACITY,
+    }))
+}
+
+// ─── World Director ────────────────────────────────────────────────────────────
+
+/// Run one World Director tick given a [`PressureGraph`].
+///
+/// Returns the list of [`DirectorDecision`]s (blueprint + reason + tick).
+/// Each blueprint can immediately be forwarded to `POST /wac/compile`.
+pub async fn director_tick(
+    State(shared): State<SharedState>,
+    Json(pressure): Json<PressureGraph>,
+) -> Json<serde_json::Value> {
+    let mut s = shared.lock().await;
+    let decisions = s.director.tick(&pressure);
+    Json(json!({
+        "decisions": decisions,
+        "total_emitted": s.director.state.total_blueprints_emitted,
+    }))
+}
+
+/// Return the World Director's recent decision history.
+pub async fn director_history(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let recent = s.director.recent_decisions(50);
+    Json(json!({
+        "decisions": recent,
+        "total_emitted": s.director.state.total_blueprints_emitted,
+        "config": s.director.config,
+    }))
 }

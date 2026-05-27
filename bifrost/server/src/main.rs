@@ -29,7 +29,6 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-
 mod api;
 mod models;
 mod state;
@@ -73,6 +72,13 @@ async fn main() {
         .route("/witness/setup",           post(api::setup_witness))
         .route("/witness/vote",            post(api::submit_witness_vote))
         .route("/witness/consensus/:tick", get(api::get_consensus))
+        // WAC — World Asset Compiler
+        .route("/wac/compile",             post(api::wac_compile))
+        .route("/wac/cache/:hash",         get(api::wac_cache_get))
+        .route("/wac/cache",               get(api::wac_cache_stats))
+        // World Director
+        .route("/wac/director/tick",       post(api::director_tick))
+        .route("/wac/director/history",    get(api::director_history))
         // Shared state + CORS (allow all for development)
         .with_state(shared)
         .layer(CorsLayer::permissive());

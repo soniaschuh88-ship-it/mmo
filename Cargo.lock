@@ -169,6 +169,7 @@ dependencies = [
  "bifrost-lockstep",
  "bifrost-physics",
  "bifrost-vis",
+ "bifrost-wac",
  "bifrost-witness",
  "hex",
  "serde",
@@ -196,6 +197,7 @@ name = "bifrost-wac"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "hex",
  "rand",
  "serde",
  "serde_json",

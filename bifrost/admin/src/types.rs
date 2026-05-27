@@ -189,7 +189,48 @@ impl Default for Quest {
     }
 }
 
-// ─── Loot ─────────────────────────────────────────────────────────────────────
+// ─── WAC — World Asset Compiler ──────────────────────────────────────────────
+
+/// Request body for `POST /api/wac/compile`.
+/// Matches `bifrost_wac::AssetBlueprint`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WacRequest {
+    pub id:                    String,  // UUID v4 string
+    pub asset_type:            String,  // snake_case AssetIntent
+    pub natural_language_spec: String,
+    pub constraints:           Vec<String>,
+    pub seed:                  u64,
+}
+
+/// One zone entry for the Director tick form.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ZonePressureInput {
+    pub zone_id:        String,
+    pub player_density: f32,
+    pub kill_rate:      f32,
+    pub loot_flow:      f32,
+    pub quest_rate:     f32,
+    pub contention:     f32,
+}
+
+/// Global pressure inputs for the Director tick form.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GlobalPressureInput {
+    pub total_players:      u32,
+    pub economy_delta:      f32,
+    pub player_trend:       f32,
+    pub narrative_momentum: f32,
+    pub quest_throughput:   f32,
+}
+
+/// Full pressure graph for `POST /api/wac/director/tick`.
+/// Matches `bifrost_wac::PressureGraph`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PressureGraphRequest {
+    pub zones:   std::collections::BTreeMap<String, ZonePressureInput>,
+    pub global:  GlobalPressureInput,
+    pub at_tick: u64,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DropEntry {

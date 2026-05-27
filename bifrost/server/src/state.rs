@@ -6,6 +6,7 @@ use bifrost_chunk::{ChunkRegistry, PeerId};
 use bifrost_lockstep::LockstepScheduler;
 use bifrost_physics::PhysicsWorld;
 use bifrost_witness::WitnessExecutor;
+use bifrost_wac::{AssetCache, WorldDirector};
 use tokio::sync::Mutex;
 
 /// The live simulation state shared across all HTTP handlers.
@@ -20,6 +21,12 @@ pub struct SimState {
     pub witness:        Option<WitnessExecutor>,
     /// Ordered list of registered peers (for display / authority rotation).
     pub peers:          Vec<PeerId>,
+
+    // ── WAC + World Director ──────────────────────────────────────────────────
+    /// BLAKE3-keyed compiled asset cache (per server instance).
+    pub asset_cache:    AssetCache,
+    /// World Director — reads pressure graph, emits AssetBlueprints.
+    pub director:       WorldDirector,
 }
 
 impl SimState {
@@ -30,6 +37,8 @@ impl SimState {
             chunk_registry: ChunkRegistry::with_default_epoch_duration(),
             witness:        None,
             peers:          Vec::new(),
+            asset_cache:    AssetCache::new(),
+            director:       WorldDirector::default(),
         }
     }
 
