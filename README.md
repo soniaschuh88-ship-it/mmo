@@ -5,117 +5,96 @@
 > **same seed = same world** — always, everywhere, forever.
 
 A competitive voxel MMO built on a deterministic distributed simulation engine.
-Human factions and a strategic AI civilization compete for territory, resources,
-and world dominance across discrete competitive epochs.
+Human factions and a strategic AI civilization compete across discrete world epochs.
 
 ---
 
-## Architecture at a Glance
+## Stack
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     BIFROST SERVER                      │
-│  Rust · deterministic · event-sourced · BLAKE3-hashed   │
-├──────────┬──────────┬──────────┬──────────┬─────────────┤
-│ Lockstep │ Witness  │   WAC    │   Run    │  Synthesis  │
-│   Tick   │ Quorum   │Compiler  │ Director │  AI (Synth) │
-├──────────┴──────────┴──────────┴──────────┴─────────────┤
-│                    NEXUS VOXEL KERNEL                   │
-│   Greedy meshing · NavMesh · Biome generator · WAC RT   │
+│                  BIFROST SERVER (Rust)                  │
+│  lockstep · witness · physics · wac · aigm              │
+│  run · synthesis · safe-city · server (40+ HTTP routes) │
 ├─────────────────────────────────────────────────────────┤
-│                  BIFROST CLIENT RUNTIME                 │
-│   ECS · WebGPU renderer · AnimFSM · Input abstraction   │
+│               NEXUS VOXEL KERNEL (Rust)                 │
+│      greedy meshing · NavMesh · biome gen · WAC RT      │
 ├─────────────────────────────────────────────────────────┤
-│                    GAME CLIENT                          │
-│   app/game.html · isometric 2.5D · Canvas/WebGPU        │
+│         BIFROST CLIENT RUNTIME (nova-* crates)          │
+│       ECS · WebGPU · AnimFSM · Camera3D · Input         │
+├─────────────────────────────────────────────────────────┤
+│                   GAME CLIENT (JS)                      │
+│        app/game.html · isometric · Canvas/WebGPU        │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Workspace Crates
+## Crates
 
-### Bifrost Layer — Networking & World Authority
-
-| Crate | Purpose |
-|---|---|
-| `bifrost-vis` | Voxel Instruction Set — deterministic opcode system (FILL_BOX, SIM_EXPLOSION, …) |
-| `bifrost-chunk` | Chunk Authority Epochs — spatial peer authority rotation |
-| `bifrost-lockstep` | Lockstep Tick Scheduler — all peers advance in lock-step |
-| `bifrost-witness` | Witness Quorum — 1 authority + 2 witnesses, BLAKE3 consensus |
-| `bifrost-physics` | Deterministic Physics Kernel — f64, BTreeMap, no SystemTime |
-| `bifrost-wac` | World Asset Compiler — LLM/designer intent → validated asset IR |
-| `bifrost-aigm` | AI Game Master — NPC AI, quest system, story engine, LLM dialogue |
-| `bifrost-run` | World Run System — discrete competitive epochs, win conditions, meta progression |
-| `bifrost-synthesis` | Synthesis AI Civilization — strategic AI faction competing against players |
-| `bifrost-safe-city` | Safe City + Economy — auction house, zone control, crafting laws |
-| `bifrost-server` | HTTP REST server — all bifrost systems exposed over 40+ routes |
-
-### Nexus Layer — Voxel World Generation
+### Bifrost — Networking & World Authority
 
 | Crate | Purpose |
 |---|---|
-| `nexus-voxel-kernel` | Greedy meshing, NavMesh (A*), fBm noise, biome generator, WAC runtime adapter |
+| `bifrost-vis` | Voxel Instruction Set — deterministic opcodes |
+| `bifrost-chunk` | Chunk Authority Epochs |
+| `bifrost-lockstep` | Lockstep Tick Scheduler |
+| `bifrost-witness` | Witness Quorum (BLAKE3 consensus) |
+| `bifrost-physics` | Deterministic Physics (f64, BTreeMap, no SystemTime) |
+| `bifrost-wac` | World Asset Compiler + Canonical Biome Registry |
+| `bifrost-aigm` | AI Game Master — NPC AI, quests, story, LLM dialogue |
+| `bifrost-run` | World Run System — epochs, win conditions, meta progression |
+| `bifrost-synthesis` | Synthesis AI Civilization |
+| `bifrost-safe-city` | Safe City + Auction House + Zone Control |
+| `bifrost-server` | HTTP REST — 40+ routes |
 
-### Bifrost Client Runtime (nova-* crates)
+### Nexus — Voxel World
 
 | Crate | Purpose |
 |---|---|
-| `nova-core` | ECS World, Transform3D (Vec3/Quat/Mat4), SceneGraph, Timer |
-| `nova-render` | WebGPU pipeline — GpuVoxelVertex, Camera3D, WGSL shaders (Phong + AO + fog) |
-| `nova-anim` | VoxelSkeleton, AnimClip (slerp), AnimFSM (idle/walk/attack/hurt/die) |
-| `nova-input` | KeyCode/MouseButton → ActionId abstraction, InputMap::default_mmo() |
+| `nexus-voxel-kernel` | Greedy meshing, NavMesh (A*), fBm noise, biome gen, WAC RT |
 
----
+### Client Runtime (nova-* crates)
 
-## Core Invariant
-
-The server is **only** authoritative over:
-
-| Responsibility | Central |
+| Crate | Purpose |
 |---|---|
-| Identity / Auth | YES |
-| Ledger / Replay | YES |
-| Epoch Authority | YES |
-| Cheat Detection | YES |
-| Global Time | YES |
-| Settlement | YES |
-| Physics | NO — swarm-computed |
-| Rendering | NO — client-computed |
-| NPC cognition | NO — distributed agents |
-
-> More players = more compute = more simulation capacity.
-> The player population **is** the supercomputer.
+| `nova-core` | ECS World, Transform3D, SceneGraph, Timer |
+| `nova-render` | WebGPU — GpuVoxelVertex, Camera3D, WGSL shaders |
+| `nova-anim` | VoxelSkeleton, AnimClip (slerp), AnimFSM |
+| `nova-input` | KeyCode/MouseButton → ActionId, InputMap |
 
 ---
 
 ## Quick Start
 
 ```bash
-# Build + run (Rust only)
-cargo run -p bifrost-server
-
-# Or with Docker
-docker build -t nova-mmo . && docker run -p 8080:8080 nova-mmo
-
-# Open game
-open http://localhost:8080
+cargo run -p bifrost-server    # server on :8080
+open http://localhost:8080     # game client
 ```
-
-See [`docs/USAGE.md`](docs/USAGE.md) for the full API reference.
 
 ---
 
-## Documentation
+## Docs
 
-| File | Contents |
-|---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture, authority model, hierarchical simulation |
-| [`docs/BIFROST-SPEC.md`](docs/BIFROST-SPEC.md) | Bifrost protocol: VIS opcodes, chunk epochs, lockstep, witness quorum |
-| [`docs/WAC.md`](docs/WAC.md) | World Asset Compiler — pipeline, asset types, hard rules |
-| [`docs/WORLD.md`](docs/WORLD.md) | World design: run system, factions, economy, safe city, biome evolution |
-| [`docs/FACTION.md`](docs/FACTION.md) | Synthesis AI civilization — design, strategy, symmetry guarantee |
-| [`docs/NOVA.md`](docs/NOVA.md) | Bifrost client runtime — ECS, WebGPU renderer, animation system |
-| [`docs/PLAN.md`](docs/PLAN.md) | Phase roadmap and crate status |
-| [`docs/USAGE.md`](docs/USAGE.md) | API reference, curl examples, environment variables |
-| [`docs/DOCKER.md`](docs/DOCKER.md) | Docker / BuildKit troubleshooting |
+```
+docs/
+├── engine/
+│   ├── architecture.md        system design, authority model
+│   ├── bifrost-protocol.md    VIS opcodes, epochs, lockstep, witness
+│   ├── wac.md                 World Asset Compiler + biome registry
+│   └── client-runtime.md      ECS, WebGPU, AnimFSM, Input (nova-* crates)
+├── game/
+│   ├── world.md               run system, zones, economy, biome evolution
+│   ├── factions.md            Synthesis AI civilization
+│   ├── players.md             classes, clone system, meta progression
+│   ├── npcs.md                AI GM layers, village NPCs, dialogue
+│   ├── monsters.md            types, stats, drops, boss mechanics
+│   ├── quests.md              quest chains, states, server authority
+│   └── skills.md              skill trees (Warrior/Mage/Rogue), world skills
+├── api/
+│   └── usage.md               all 40+ HTTP routes with curl examples
+├── ops/
+│   └── docker.md              Docker / BuildKit troubleshooting
+└── planning/
+    └── roadmap.md             crate status, open PRs, phase roadmap
+```
