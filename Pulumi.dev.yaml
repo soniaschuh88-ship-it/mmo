@@ -3,6 +3,10 @@ config:
   container-gcp-typescript:containerPort: "8080"
   container-gcp-typescript:cpu: "0.5"
   container-gcp-typescript:memory: 1Gi
+  # Azure AI Foundry — primary LLM backend (bkg-resource, germanywestcentral)
+  container-gcp-typescript:azureAiEndpoint: https://bkg-resource.services.ai.azure.com
+  container-gcp-typescript:azureAiDeployment: gpt-4o-mini
+  # NVIDIA NIM — fallback LLM backend
   container-gcp-typescript:nvidiaBaseUrl: https://integrate.api.nvidia.com/v1
   container-gcp-typescript:nvidiaModel: meta/llama-3.3-70b-instruct
   azure-native:location: eastus

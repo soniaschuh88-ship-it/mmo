@@ -14,12 +14,12 @@ members = [
     "bifrost/run",
     "bifrost/synthesis",
     "bifrost/safe-city",
-    "nexus/voxel-kernel",
-    # ── NOVA Engine ────────────────────────────────────────────────────────────
-    "nova/core",      # ECS · Transform3D · SceneGraph · Time
-    "nova/render",    # WebGPU voxel pipeline · Camera3D · WGSL shaders
-    "nova/anim",      # VoxelSkeleton · AnimClip · AnimFSM
-    "nova/input",     # KeyCode/Mouse → ActionId abstraction
+    # ── NOVA Engine + Voxel Kernel (unified under bifrost/) ───────────────────
+    "bifrost/voxel-kernel",   # Headless voxel runtime · WAC adapter · chunk gen
+    "bifrost/nova-core",      # ECS · Transform3D · SceneGraph · Time
+    "bifrost/nova-render",    # WebGPU voxel pipeline · Camera3D · WGSL shaders
+    "bifrost/nova-anim",      # VoxelSkeleton · AnimClip · AnimFSM
+    "bifrost/nova-input",     # KeyCode/Mouse → ActionId abstraction
 ]
 
 [workspace.package]
@@ -71,9 +71,9 @@ bifrost-wasm     = { path = "bifrost/wasm" }
 bifrost-run       = { path = "bifrost/run" }
 bifrost-synthesis  = { path = "bifrost/synthesis" }
 bifrost-safe-city  = { path = "bifrost/safe-city" }
-nexus-voxel-kernel = { path = "nexus/voxel-kernel" }
-# NOVA Engine
-nova-core   = { path = "nova/core" }
-nova-render = { path = "nova/render" }
-nova-anim   = { path = "nova/anim" }
-nova-input  = { path = "nova/input" }
+# NOVA Engine + Voxel Kernel (unified under bifrost/ — single source of truth)
+nexus-voxel-kernel = { path = "bifrost/voxel-kernel" }
+nova-core          = { path = "bifrost/nova-core" }
+nova-render        = { path = "bifrost/nova-render" }
+nova-anim          = { path = "bifrost/nova-anim" }
+nova-input         = { path = "bifrost/nova-input" }
