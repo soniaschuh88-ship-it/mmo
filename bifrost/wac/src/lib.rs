@@ -53,6 +53,9 @@ pub mod validate;
 #[cfg(feature = "nvidia-nim")]
 pub mod nvidia;
 
+#[cfg(feature = "azure-ai")]
+pub mod azure;
+
 pub use biomes::{
     AmbientFx, BiomeDefinition, BiomeKey, BiomeRegistry,
     BIOME_COLORS, BIOME_IDS, TILE_PALETTE, canonicalize_biome_id,

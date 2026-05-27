@@ -22,8 +22,10 @@ reqwest = { version = "0.12", optional = true, default-features = false, feature
 
 [features]
 # Enable the NVIDIA NIM API client for LLM-backed asset spec generation.
-# Required for Synthesis AI faction real-time world generation.
 nvidia-nim = ["dep:reqwest"]
+# Enable the Azure AI Foundry client (bkg-resource, germanywestcentral).
+# Takes priority over nvidia-nim when AZURE_AI_KEY env var is set.
+azure-ai   = ["dep:reqwest"]
 
 [dev-dependencies]
 # nothing extra needed for unit tests

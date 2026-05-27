@@ -12,13 +12,28 @@ const cpu = config.getNumber("cpu") || 1;
 const memory = config.get("memory") || "1Gi";
 const concurrency = config.getNumber("concurrency") || 80;
 
-// NVIDIA NIM configuration — used by bifrost-wac (nvidia-nim feature) for
-// LLM-backed asset generation and by the Synthesis AI faction brain.
+// ── LLM Backend Configuration ─────────────────────────────────────────────────
 //
-// Set the API key with:
+// bKG uses two LLM backends. Azure AI is preferred when AZURE_AI_KEY is set.
+// NVIDIA NIM is the fallback.
+//
+// Azure AI Foundry (primary)
+//   Resource:    bkg-resource  (germanywestcentral)
+//   Project:     bkg
+//   Subscription: 69e114eb-2f9b-4ab4-9a70-769f465bba74
+//   Endpoint:    https://bkg-resource.services.ai.azure.com/
+//
+//   pulumi config set --secret container-gcp-typescript:azureAiKey <key>
+//   Key location: Azure portal → bkg-resource → Keys and Endpoint
+//
+// NVIDIA NIM (fallback)
+//   Obtain a free API key at: https://build.nvidia.com/
 //   pulumi config set --secret container-gcp-typescript:nvidiaApiKey <key>
 //
-// Obtain a free API key at: https://build.nvidia.com/
+const azureAiKey        = config.requireSecret("azureAiKey");
+const azureAiEndpoint   = config.get("azureAiEndpoint")   || "https://bkg-resource.services.ai.azure.com";
+const azureAiDeployment = config.get("azureAiDeployment") || "gpt-4o-mini";
+
 const nvidiaApiKey   = config.requireSecret("nvidiaApiKey");
 const nvidiaBaseUrl  = config.get("nvidiaBaseUrl") || "https://integrate.api.nvidia.com/v1";
 const nvidiaModel    = config.get("nvidiaModel")   || "meta/llama-3.3-70b-instruct";
@@ -82,9 +97,24 @@ const service = new gcp.cloudrun.Service("service", {
                             containerPort,
                         },
                     ],
-                    // NVIDIA NIM credentials for bifrost-wac LLM generation
-                    // and Synthesis AI faction brain (nvidia-nim feature).
+                    // LLM backend credentials for bifrost-wac (azure-ai + nvidia-nim features)
+                    // and bifrost-aigm NPC dialogue (azure-ai feature).
+                    // Azure AI Foundry is preferred; NVIDIA NIM is the fallback.
                     envs: [
+                        // ── Azure AI Foundry (primary) ───────────────────────
+                        {
+                            name:  "AZURE_AI_KEY",
+                            value: azureAiKey,
+                        },
+                        {
+                            name:  "AZURE_AI_ENDPOINT",
+                            value: azureAiEndpoint,
+                        },
+                        {
+                            name:  "AZURE_AI_DEPLOYMENT",
+                            value: azureAiDeployment,
+                        },
+                        // ── NVIDIA NIM (fallback) ────────────────────────────
                         {
                             name:  "NVIDIA_API_KEY",
                             value: nvidiaApiKey,
