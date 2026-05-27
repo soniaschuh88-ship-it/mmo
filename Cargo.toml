@@ -13,6 +13,11 @@ members = [
     "bifrost/synthesis",
     "bifrost/safe-city",
     "nexus/voxel-kernel",
+    # ── NOVA Engine ────────────────────────────────────────────────────────────
+    "nova/core",      # ECS · Transform3D · SceneGraph · Time
+    "nova/render",    # WebGPU voxel pipeline · Camera3D · WGSL shaders
+    "nova/anim",      # VoxelSkeleton · AnimClip · AnimFSM
+    "nova/input",     # KeyCode/Mouse → ActionId abstraction
 ]
 
 [workspace.package]
@@ -34,6 +39,7 @@ rand        = "0.8"
 
 # Utils
 thiserror   = "1"
+bytemuck    = { version = "1", features = ["derive"] }
 uuid        = { version = "1", features = ["v4", "serde"] }
 hex         = "0.4"
 tokio       = { version = "1", features = ["full"] }
@@ -60,3 +66,8 @@ bifrost-run       = { path = "bifrost/run" }
 bifrost-synthesis  = { path = "bifrost/synthesis" }
 bifrost-safe-city  = { path = "bifrost/safe-city" }
 nexus-voxel-kernel = { path = "nexus/voxel-kernel" }
+# NOVA Engine
+nova-core   = { path = "nova/core" }
+nova-render = { path = "nova/render" }
+nova-anim   = { path = "nova/anim" }
+nova-input  = { path = "nova/input" }
