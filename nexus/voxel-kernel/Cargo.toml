@@ -1,0 +1,22 @@
+[package]
+name        = "nexus-voxel-kernel"
+description = "Headless Voxel Runtime — deterministic voxel execution engine for NOVA MMO worlds"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+blake3      = { workspace = true }
+hex         = { workspace = true }
+thiserror   = { workspace = true }
+# Bifrost integration (optional — kernel is usable standalone)
+bifrost-vis   = { workspace = true, optional = true }
+bifrost-chunk = { workspace = true, optional = true }
+
+[features]
+# Enable BIFROST chunk streaming integration
+bifrost = ["bifrost-vis", "bifrost-chunk"]

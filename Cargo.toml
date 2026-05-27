@@ -8,6 +8,7 @@ members = [
     "bifrost/physics",
     "bifrost/server",
     "bifrost/aigm",
+    "nexus/voxel-kernel",
 ]
 
 [workspace.package]
@@ -50,3 +51,4 @@ bifrost-lockstep = { path = "bifrost/lockstep" }
 bifrost-witness  = { path = "bifrost/witness" }
 bifrost-physics  = { path = "bifrost/physics" }
 bifrost-server   = { path = "bifrost/server" }
+nexus-voxel-kernel = { path = "nexus/voxel-kernel" }
