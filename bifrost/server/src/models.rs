@@ -156,3 +156,95 @@ impl ErrorResp {
         Self { error: msg.into() }
     }
 }
+
+// ─── Run System ───────────────────────────────────────────────────────────────
+
+/// POST /run — start a new world run.
+#[derive(Debug, Deserialize)]
+pub struct StartRunReq {
+    /// Win condition variant (serialised `EndCondition`).
+    pub end_condition:   serde_json::Value,
+    pub player_factions: Vec<String>,
+    pub ai_factions:     Vec<String>,
+    /// World seed forwarded to the WAC pipeline for world generation.
+    pub world_seed:      u64,
+    pub label:           String,
+}
+
+/// POST /run/tick — evaluate win conditions for the current tick.
+#[derive(Debug, Deserialize)]
+pub struct RunTickReq {
+    pub current_tick:      u64,
+    /// faction_id → zones controlled.
+    pub zones_controlled:  std::collections::BTreeMap<String, u32>,
+    /// faction_id → tech level.
+    pub tech_levels:       std::collections::BTreeMap<String, u32>,
+    /// faction_id → economy fraction (0.0–1.0).
+    pub economy_fractions: std::collections::BTreeMap<String, f32>,
+}
+
+/// POST /run/end — force-end the active run.
+#[derive(Debug, Deserialize)]
+pub struct EndRunReq {
+    pub winner_faction_id: Option<String>,
+    pub reason:            String,
+}
+
+// ─── Synthesis AI ─────────────────────────────────────────────────────────────
+
+/// POST /synthesis/init — create (or reset) the Synthesis AI faction.
+#[derive(Debug, Deserialize)]
+pub struct SynthesisInitReq {
+    pub faction_id:   String,
+    pub display_name: String,
+}
+
+/// POST /synthesis/tick — run one Synthesis AI tick.
+///
+/// The caller provides a lightweight world snapshot; the AI emits intents.
+#[derive(Debug, Deserialize)]
+pub struct SynthesisTickReq {
+    pub current_tick:   u64,
+    /// Zones currently owned by the Synthesis faction.
+    pub owned_zones:    Vec<String>,
+    /// Current threat level from human factions (0.0–1.0).
+    pub threat_level:   f32,
+    /// Available resource budget for this tick (reserved for future tick logic).
+    #[allow(dead_code)]
+    pub resource_budget: u32,
+}
+
+// ─── Safe City / Economy ──────────────────────────────────────────────────────
+
+/// POST /safe-city/auction/list — post a new auction listing.
+#[derive(Debug, Deserialize)]
+pub struct PostListingReq {
+    pub seller_id:  String,
+    pub item_id:    String,
+    pub item_name:  String,
+    pub quantity:   u32,
+    pub unit_price: u32,
+    pub current_tick: u64,
+}
+
+/// POST /safe-city/auction/buy — purchase a listing at the fixed price.
+///
+/// `budget` is the buyer's available gold. The auction house validates
+/// it covers the full price + tax before completing the sale.
+#[derive(Debug, Deserialize)]
+pub struct BuyListingReq {
+    pub listing_id: String,   // UUID hex
+    pub buyer_id:   String,
+    pub budget:     u32,
+}
+
+/// POST /safe-city/zones/:id/influence — update faction influence on a zone.
+#[derive(Debug, Deserialize)]
+pub struct ZoneInfluenceReq {
+    pub faction_id: String,
+    /// Delta to add (positive = gaining influence, negative = losing).
+    pub delta:      f32,
+    /// World tick at time of influence update (logged for audit).
+    #[allow(dead_code)]
+    pub current_tick: u64,
+}
