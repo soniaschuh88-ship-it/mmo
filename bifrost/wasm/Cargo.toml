@@ -16,6 +16,6 @@ wasm-bindgen = { workspace = true }
 serde_json   = { workspace = true }
 # bifrost-wac provides BiomeKey, BIOME_COLORS, BiomeRegistry.
 bifrost-wac  = { workspace = true }
-# nexus-voxel-kernel provides the quintic-smoothstep noise functions
-# that exactly match the JS `sn()` / `fbm()` in game.html.
-nexus-voxel-kernel = { workspace = true }
+# bifrost-kernel now includes the voxel world engine (merged from nexus-voxel-kernel).
+# Provides the quintic-smoothstep noise functions that match the JS sn()/fbm() in game.html.
+bifrost-kernel = { workspace = true }

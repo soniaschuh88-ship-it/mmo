@@ -1,6 +1,6 @@
 [package]
 name        = "bifrost-kernel"
-description = "Foundational primitives that enforce the BIFROST architecture rules"
+description = "Forge Kernel — BIFROST architecture rules (R1-R5) + NOVA voxel world engine"
 version.workspace    = true
 edition.workspace    = true
 license.workspace    = true
@@ -8,7 +8,17 @@ authors.workspace    = true
 repository.workspace = true
 
 [dependencies]
-serde      = { workspace = true }
-serde_json = { workspace = true }
-thiserror  = { workspace = true }
-blake3     = "1"
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+blake3      = { workspace = true }
+hex         = { workspace = true }
+thiserror   = { workspace = true }
+# Voxel world engine — WAC bridge (BiomeIR lives in bifrost-wac, R1)
+bifrost-wac   = { workspace = true }
+# Bifrost chunk-streaming integration (optional — kernel usable standalone)
+bifrost-vis   = { workspace = true, optional = true }
+bifrost-chunk = { workspace = true, optional = true }
+
+[features]
+# Enable BIFROST chunk streaming integration
+bifrost = ["bifrost-vis", "bifrost-chunk"]

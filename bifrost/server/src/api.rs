@@ -556,8 +556,8 @@ pub async fn director_history(State(shared): State<SharedState>) -> Json<serde_j
 
 // ─── Nexus Voxel Kernel ────────────────────────────────────────────────────────
 
-use nexus_voxel_kernel::bridge::{WacError, WacResult};
-use nexus_voxel_kernel::core::ChunkPos;
+use bifrost_kernel::bridge::{WacError, WacResult};
+use bifrost_kernel::core::ChunkPos;
 
 /// Apply a WAC JSON document to the nexus voxel kernel.
 ///
@@ -856,7 +856,7 @@ pub async fn end_run(
                 // this registers the biome for future chunk generation).
                 s.nexus_rt.apply_biome_ir(
                     biome_ir,
-                    nexus_voxel_kernel::core::ChunkPos::default(),
+                    bifrost_kernel::core::ChunkPos::default(),
                 );
                 compiled_count += 1;
             }

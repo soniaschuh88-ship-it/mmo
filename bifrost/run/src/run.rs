@@ -5,8 +5,9 @@ use uuid::Uuid;
 
 use crate::end_condition::EndCondition;
 
-/// Stable identifier for a faction (human player guild or AI sub-faction).
-pub type FactionId = String;
+// R1 — One concept, one crate.
+// FactionId is defined once in bifrost_kernel.
+pub use bifrost_kernel::FactionId;
 
 /// Stable identifier for a single world run epoch.
 pub type RunId = Uuid;

@@ -11,7 +11,7 @@
 //! ## Architecture
 //!
 //! ```text
-//! nexus-voxel-kernel                 nova-render
+//! bifrost-kernel                     nova-render
 //! ──────────────────                 ────────────────────────────────────
 //! VoxelChunk
 //!   │  build_mesh()                  WebGPU VoxelPass

@@ -23,7 +23,7 @@ use bifrost_aigm::{NpcRegistry, QuestRegistry, WorldEvent};
 use bifrost_aigm::npc::context::AiContext;
 use bifrost_aigm::npc::behavior::{BehaviorConfig, NpcFaction};
 use bifrost_aigm::npc::registry::NpcState;
-use nexus_voxel_kernel::bridge::RuntimeAdapter;
+use bifrost_kernel::bridge::RuntimeAdapter;
 use std::collections::BTreeMap;
 use tokio::sync::Mutex;
 
