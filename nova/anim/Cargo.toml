@@ -1,0 +1,13 @@
+[package]
+name        = "nova-anim"
+description = "NOVA Engine — VoxelSkeleton, AnimClip, AnimFSM, BlendTree"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde     = { workspace = true }
+thiserror = { workspace = true }
+nova-core = { workspace = true }
