@@ -69,7 +69,13 @@ wss.on("connection", ws => {
 async function bifrostFetch(urlPath, options = {}) {
     const url = `${BIFROST_URL}${urlPath}`;
     if (typeof globalThis.fetch === "function") {
-        const res  = await globalThis.fetch(url, options);
+        const res  = await globalThis.fetch(url, {
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+                ...(options.headers || {}),
+            },
+        });
         const body = await res.json().catch(() => ({}));
         return { ok: res.ok, status: res.status, body };
     }
