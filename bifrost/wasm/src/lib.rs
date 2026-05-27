@@ -25,7 +25,7 @@
 use wasm_bindgen::prelude::*;
 
 use bifrost_wac::biomes::{BIOME_IDS, BIOME_COLORS, BiomeKey, BiomeRegistry};
-use nexus_voxel_kernel::generator::noise::{fbm_2d, hash2};
+use bifrost_kernel::generator::noise::{fbm_2d, hash2};
 
 // ─── Noise ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ use nexus_voxel_kernel::generator::noise::{fbm_2d, hash2};
 #[wasm_bindgen]
 pub fn sn_noise(x: f64, y: f64, seed: f64) -> f64 {
     let s = seed as u64;
-    nexus_voxel_kernel::generator::noise::value_noise_2d(x, y, s)
+    bifrost_kernel::generator::noise::value_noise_2d(x, y, s)
 }
 
 /// Fractal Brownian Motion — matches `fbm(x,y,oct,s)` in game.html.

@@ -184,7 +184,7 @@ impl WacResult {
 
 // R1 — One concept, one crate.
 // BiomeIR is defined once in bifrost-wac (the "World Type Authority").
-// nexus-voxel-kernel imports it from there rather than redefining it.
+// bifrost-kernel imports it from there rather than redefining it.
 pub use bifrost_wac::types::BiomeIR;
 
 // ── RuntimeAdapter ────────────────────────────────────────────────────────────

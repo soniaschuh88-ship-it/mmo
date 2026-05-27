@@ -33,5 +33,5 @@ bifrost-run       = { workspace = true }
 bifrost-synthesis = { workspace = true }
 bifrost-safe-city = { workspace = true }
 bifrost-aigm      = { workspace = true }
-nexus-voxel-kernel = { workspace = true }
+# nexus-voxel-kernel is now part of bifrost-kernel (merged)
 uuid = { workspace = true }

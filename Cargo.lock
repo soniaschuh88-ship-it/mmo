@@ -146,7 +146,11 @@ dependencies = [
 name = "bifrost-kernel"
 version = "0.1.0"
 dependencies = [
+ "bifrost-chunk",
+ "bifrost-vis",
+ "bifrost-wac",
  "blake3",
+ "hex",
  "serde",
  "serde_json",
  "thiserror",
@@ -210,7 +214,6 @@ dependencies = [
  "bifrost-wac",
  "bifrost-witness",
  "hex",
- "nexus-voxel-kernel",
  "serde",
  "serde_json",
  "thiserror",
@@ -252,7 +255,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "hex",
- "nova-anim",
  "rand",
  "reqwest",
  "serde",
@@ -265,8 +267,8 @@ dependencies = [
 name = "bifrost-wasm"
 version = "0.1.0"
 dependencies = [
+ "bifrost-kernel",
  "bifrost-wac",
- "nexus-voxel-kernel",
  "serde_json",
  "wasm-bindgen",
 ]
@@ -962,23 +964,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "nexus-voxel-kernel"
-version = "0.1.0"
-dependencies = [
- "bifrost-chunk",
- "bifrost-vis",
- "bifrost-wac",
- "blake3",
- "hex",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "nova-anim"
 version = "0.1.0"
 dependencies = [
+ "bifrost-wac",
  "nova-core",
  "serde",
  "thiserror",
@@ -1004,8 +993,8 @@ dependencies = [
 name = "nova-render"
 version = "0.1.0"
 dependencies = [
+ "bifrost-kernel",
  "bytemuck",
- "nexus-voxel-kernel",
  "nova-core",
  "serde",
  "thiserror",

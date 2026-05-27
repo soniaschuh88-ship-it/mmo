@@ -1,11 +1,11 @@
 //! GPU vertex layout, mesh conversion, and chunk registry.
 //!
-//! This module bridges [`nexus_voxel_kernel::core::VoxelMesh`] (CPU-side
+//! This module bridges [`bifrost_kernel::core::VoxelMesh`] (CPU-side
 //! greedy mesh) to the WebGPU vertex buffer format used by `VOXEL_SHADER`.
 
 use std::collections::BTreeMap;
 
-use nexus_voxel_kernel::core::{ChunkPos, VoxelMesh};
+use bifrost_kernel::core::{ChunkPos, VoxelMesh};
 
 // ─── GpuVoxelVertex ───────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ pub struct GpuVoxelVertex {
 /// ready for a `wgpu::Buffer`.
 ///
 /// # Arguments
-/// * `mesh` — output of [`nexus_voxel_kernel::core::build_mesh`]
+/// * `mesh` — output of [`bifrost_kernel::core::build_mesh`]
 ///
 /// # Returns
 /// `(vertices, indices)` where `bytemuck::cast_slice(&vertices)` gives the
@@ -138,7 +138,7 @@ impl ChunkMeshRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nexus_voxel_kernel::core::{build_mesh, ChunkPos, Voxel, VoxelChunk, materials};
+    use bifrost_kernel::core::{build_mesh, ChunkPos, Voxel, VoxelChunk, materials};
 
     fn one_voxel_mesh() -> VoxelMesh {
         let mut chunk = VoxelChunk::empty(ChunkPos::default());

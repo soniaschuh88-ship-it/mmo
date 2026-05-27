@@ -7,8 +7,10 @@ use crate::agent::AgentNode;
 use crate::memory::{FactionMemory, RunMemoryGraph};
 use crate::strategy::{StrategyGoal, WorldModel};
 
-pub type FactionId = String;
-pub type ZoneId    = String;
+// R1 — One concept, one crate.
+// FactionId and ZoneId are defined once in bifrost_kernel.
+// Importing the canonical types rather than re-defining them here.
+pub use bifrost_kernel::{FactionId, ZoneId};
 
 // ─── AiFaction ───────────────────────────────────────────────────────────────
 

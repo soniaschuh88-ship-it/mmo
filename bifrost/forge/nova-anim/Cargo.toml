@@ -11,3 +11,10 @@ repository.workspace = true
 serde     = { workspace = true }
 thiserror = { workspace = true }
 nova-core = { workspace = true }
+# Optional bridge: converts bifrost-wac AnimationGraphIR → live AnimStateMachine.
+# R1: bifrost-wac does NOT depend on nova-anim; the bridge lives here.
+bifrost-wac = { workspace = true, optional = true }
+
+[features]
+# Enable the WAC → FSM bridge (bifrost_wac::AnimationGraphIR → AnimStateMachine).
+wac = ["bifrost-wac"]
