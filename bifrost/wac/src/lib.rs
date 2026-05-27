@@ -42,6 +42,7 @@
 //! |---|---|
 //! | `nvidia-nim` | Enables [`nvidia`] module — NVIDIA NIM API client for real LLM generation |
 
+pub mod biomes;
 pub mod cache;
 pub mod compile;
 pub mod director;
@@ -52,6 +53,10 @@ pub mod validate;
 #[cfg(feature = "nvidia-nim")]
 pub mod nvidia;
 
+pub use biomes::{
+    AmbientFx, BiomeDefinition, BiomeKey, BiomeRegistry,
+    BIOME_COLORS, BIOME_IDS, TILE_PALETTE, canonicalize_biome_id,
+};
 pub use cache::AssetCache;
 pub use compile::compile;
 pub use director::WorldDirector;
