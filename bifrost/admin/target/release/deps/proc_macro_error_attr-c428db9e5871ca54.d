@@ -1,0 +1,7 @@
+/home/bkg/workspace/mmo/bifrost/admin/target/release/deps/proc_macro_error_attr-c428db9e5871ca54.d: /home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/lib.rs /home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/parse.rs /home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/settings.rs
+
+/home/bkg/workspace/mmo/bifrost/admin/target/release/deps/libproc_macro_error_attr-c428db9e5871ca54.so: /home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/lib.rs /home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/parse.rs /home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/settings.rs
+
+/home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/lib.rs:
+/home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/parse.rs:
+/home/bkg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro-error-attr-1.0.4/src/settings.rs:

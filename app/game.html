@@ -417,19 +417,44 @@ const spNPC=[],spMon=[];
 function rng(x,y,s){let n=Math.sin(x*127.1+y*311.7+s*74.3)*43758.5453;return n-Math.floor(n);}
 function sn(x,y,s){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,ux=xf*xf*(3-2*xf),uy=yf*yf*(3-2*yf);return rng(xi,yi,s)*(1-ux)*(1-uy)+rng(xi+1,yi,s)*ux*(1-uy)+rng(xi,yi+1,s)*(1-ux)*uy+rng(xi+1,yi+1,s)*ux*uy;}
 function fbm(x,y,oct,s){let v=0,a=.5,f=1,m=0;for(let i=0;i<oct;i++){v+=sn(x*f,y*f,s+i*17)*a;m+=a;a*=.5;f*=2;}return v/m;}
-const MTYPE={
+// Default monster types — overwritten from admin API if available
+let MTYPE={
   wolf:   {name:'Wolf',    hp:30,maxHp:30,atk:8, def:3, xp:15,gold:3, color:'#8B5A2B',icon:'🐺'},
   goblin: {name:'Goblin',  hp:28,maxHp:28,atk:10,def:4, xp:20,gold:5, color:'#3a8a3a',icon:'👺'},
   rat:    {name:'Rat',     hp:15,maxHp:15,atk:5, def:1, xp:8, gold:1, color:'#8a7060',icon:'🐀'},
   skeleton:{name:'Skeleton',hp:45,maxHp:45,atk:13,def:7,xp:32,gold:8, color:'#c8c8b0',icon:'💀'},
   boss:   {name:'Dungeon Overlord',hp:200,maxHp:200,atk:25,def:15,xp:300,gold:100,color:'#a020a0',icon:'👹'},
 };
-const QDEFS={
+// Default quest defs — overwritten from admin API if available
+let QDEFS={
   wolves: {title:'Wolf Problem',   icon:'🐺',target:'wolf',    count:5,gold:40,xp:80, who:'Guard Captain', desc:'Kill 5 wolves.'},
   rats:   {title:'Rat Infestation',icon:'🐀',target:'rat',     count:5,gold:30,xp:60, who:'Innkeeper Bram',desc:'Kill 5 rats.'},
   goblins:{title:'Goblin Menace',  icon:'👺',target:'goblin',  count:8,gold:60,xp:120,who:'Village Elder', desc:'Kill 8 goblins.'},
   tome:   {title:'Ancient Tome',   icon:'📖',target:'skeleton',count:4,gold:80,xp:160,who:'Wizard Mervyn', desc:'Defeat 4 skeletons.'},
 };
+// Loaded from admin API before world generation
+let _adminNpcs = null;
+
+async function loadAdminData() {
+  try {
+    const [mRes, qRes, nRes] = await Promise.all([
+      fetch('/admin-api/loot/monsters').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/admin-api/quests').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/admin-api/npcs').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    if (mRes && mRes.length) {
+      MTYPE = {};
+      for (const m of mRes) MTYPE[m.id] = {name:m.name,hp:m.hp,maxHp:m.hp,atk:m.atk,def:m.def,xp:m.xp,gold:m.gold,color:m.color,icon:m.icon};
+    }
+    if (qRes && qRes.length) {
+      QDEFS = {};
+      for (const q of qRes) QDEFS[q.id] = {title:q.title,icon:q.icon,target:q.target,count:q.count,gold:q.gold,xp:q.xp,who:q.giverName,desc:q.desc};
+    }
+    if (nRes && nRes.length) _adminNpcs = nRes;
+  } catch(e) {
+    console.warn('Admin data load failed, using defaults:', e);
+  }
+}
 function generateWorld(){
   for(let y=0;y<W;y++)for(let x=0;x<W;x++){
     const nx=(x/W)*2-1,ny=(y/W)*2-1,dist=Math.sqrt(nx*nx+ny*ny);
@@ -459,7 +484,12 @@ function generateWorld(){
     for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){if(tx+dx>=0&&ty+dy>=0&&tx+dx<W&&ty+dy<W){HM[ty+dy][tx+dx]=5;BM[ty+dy][tx+dx]=BIOME.BL;}}
   }
   for(let y=0;y<W;y++)for(let x=0;x<W;x++){if(BM[y][x]===BIOME.FO&&rng(x,y,SEED+5)>.65)TREE[y][x]=1;}
-  const nDefs=[
+  // Use admin-managed NPCs if loaded; fall back to defaults
+  const nDefs = (_adminNpcs && _adminNpcs.length) ? _adminNpcs.map(n=>({
+    id:n.id, wx:(n.x||CX)+0.5, wy:(n.y||CY)+0.5,
+    name:n.name, color:n.color, icon:n.icon,
+    questId:n.questId||null, lines:n.lines||[],
+  })) : [
     {id:'guard',  wx:CX-.5,wy:CY-1.5,name:'Guard Captain',  color:'#a0a0b8',icon:'⚔',questId:'wolves', lines:["Wolves plague our farms! We need a hero.","Goblins grow bolder each moon."]},
     {id:'innkeep',wx:CX+1.5,wy:CY-1.5,name:'Innkeeper Bram',color:'#c08030',icon:'🍺',questId:'rats',   lines:["Giant rats in my cellar! Please help.","Finest ale for whoever clears them!"]},
     {id:'elder',  wx:CX+.5,wy:CY+2.5,name:'Village Elder',  color:'#d4a017',icon:'📜',questId:'goblins',lines:["Goblins raid the north pass every moon.","Drive them from the mountains, hero."]},
@@ -1103,8 +1133,9 @@ document.getElementById('btn-tovoxel').addEventListener('click',()=>{
 });
 document.getElementById('btn-back-class').addEventListener('click',()=>showScreen('s-class'));
 
-document.getElementById('btn-toworld').addEventListener('click',()=>{
+document.getElementById('btn-toworld').addEventListener('click', async ()=>{
   const name=document.getElementById('cname').value.trim()||'Hero';
+  await loadAdminData();  // populate MTYPE, QDEFS, _adminNpcs from /admin-api
   showScreen('s-game');
   generateWorld();
   prerenderSprite();

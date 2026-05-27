@@ -5,12 +5,60 @@
     "description": "A voxel RPG world powered by Bifrost"
   },
   "biomes": [
-    { "id": "forest",   "name": "Forest",   "color": "#2d5a1b", "tileType": "forest",   "zone": "NW", "description": "Dense woodland teeming with wolves",           "encounterRate": 0.4 },
-    { "id": "mountain", "name": "Mountains","color": "#6e6e6e", "tileType": "mountain", "zone": "NE", "description": "Rocky peaks patrolled by goblins",              "encounterRate": 0.5 },
-    { "id": "dungeon",  "name": "Dungeon",  "color": "#2a1a2a", "tileType": "dungeon",  "zone": "SE", "description": "Dark caverns hiding rats, skeletons, and worse", "encounterRate": 0.7 },
-    { "id": "village",  "name": "Village",  "color": "#c8a060", "tileType": "village",  "zone": "C",  "description": "The central settlement — NPCs and quests",       "encounterRate": 0.0 },
-    { "id": "river",    "name": "River",    "color": "#2060c0", "tileType": "water",    "zone": "C",  "description": "A river with a stone bridge",                   "encounterRate": 0.1 },
-    { "id": "swamp",    "name": "Swamp",    "color": "#3a5a2a", "tileType": "swamp",    "zone": "SW", "description": "Murky wetlands with hidden dangers",            "encounterRate": 0.3 }
+    {
+      "id": "forest",
+      "name": "Forest",
+      "color": "#2d5a1b",
+      "tileType": "forest",
+      "zone": "NW",
+      "description": "Dense woodland teeming with wolves",
+      "encounterRate": 0.4
+    },
+    {
+      "id": "mountain",
+      "name": "Mountains",
+      "color": "#6e6e6e",
+      "tileType": "mountain",
+      "zone": "NE",
+      "description": "Rocky peaks patrolled by goblins",
+      "encounterRate": 0.5
+    },
+    {
+      "id": "dungeon",
+      "name": "Dungeon",
+      "color": "#2a1a2a",
+      "tileType": "dungeon",
+      "zone": "SE",
+      "description": "Dark caverns hiding rats, skeletons, and worse",
+      "encounterRate": 0.7
+    },
+    {
+      "id": "village",
+      "name": "Village",
+      "color": "#c8a060",
+      "tileType": "village",
+      "zone": "C",
+      "description": "The central settlement — NPCs and quests",
+      "encounterRate": 0
+    },
+    {
+      "id": "river",
+      "name": "River",
+      "color": "#2060c0",
+      "tileType": "water",
+      "zone": "C",
+      "description": "A river with a stone bridge",
+      "encounterRate": 0.1
+    },
+    {
+      "id": "swamp",
+      "name": "Swamp",
+      "color": "#3a5a2a",
+      "tileType": "swamp",
+      "zone": "SW",
+      "description": "Murky wetlands with hidden dangers",
+      "encounterRate": 0.3
+    }
   ],
   "story": {
     "worldMood": "calm",
@@ -20,11 +68,41 @@
         "title": "The Goblin Threat",
         "synopsis": "Goblin raids have grown bolder. The village elder calls for a hero.",
         "status": "active",
-        "affectedZones": ["mountain", "village"],
+        "affectedZones": [
+          "mountain",
+          "village"
+        ],
         "beats": [
-          { "id": "beat-001-1", "title": "First Contact",  "description": "Players encounter goblins raiding the northern farms.", "minTick": 0,    "requiredQuests": [],          "consequences": [] },
-          { "id": "beat-001-2", "title": "The Warchief",   "description": "A goblin warchief unites the clans under one banner.",   "minTick": 500,  "requiredQuests": ["goblins"], "consequences": ["change_mood:tense"] },
-          { "id": "beat-001-3", "title": "Final Assault",  "description": "The united goblin horde marches on the village.",        "minTick": 1000, "requiredQuests": [],          "consequences": ["change_mood:war"] }
+          {
+            "id": "beat-001-1",
+            "title": "First Contact",
+            "description": "Players encounter goblins raiding the northern farms.",
+            "minTick": 0,
+            "requiredQuests": [],
+            "consequences": []
+          },
+          {
+            "id": "beat-001-2",
+            "title": "The Warchief",
+            "description": "A goblin warchief unites the clans under one banner.",
+            "minTick": 500,
+            "requiredQuests": [
+              "goblins"
+            ],
+            "consequences": [
+              "change_mood:tense"
+            ]
+          },
+          {
+            "id": "beat-001-3",
+            "title": "Final Assault",
+            "description": "The united goblin horde marches on the village.",
+            "minTick": 1000,
+            "requiredQuests": [],
+            "consequences": [
+              "change_mood:war"
+            ]
+          }
         ]
       },
       {
@@ -32,10 +110,30 @@
         "title": "Secrets of the Dungeon",
         "synopsis": "Ancient magic stirs in the deepest chambers.",
         "status": "active",
-        "affectedZones": ["dungeon"],
+        "affectedZones": [
+          "dungeon"
+        ],
         "beats": [
-          { "id": "beat-002-1", "title": "Strange Sounds",  "description": "Villagers report eerie sounds from the dungeon entrance.", "minTick": 0,   "requiredQuests": [],       "consequences": [] },
-          { "id": "beat-002-2", "title": "The Ancient Tome", "description": "The Wizard senses dark energy from a recovered tome.",     "minTick": 200, "requiredQuests": ["tome"], "consequences": ["change_mood:anxious"] }
+          {
+            "id": "beat-002-1",
+            "title": "Strange Sounds",
+            "description": "Villagers report eerie sounds from the dungeon entrance.",
+            "minTick": 0,
+            "requiredQuests": [],
+            "consequences": []
+          },
+          {
+            "id": "beat-002-2",
+            "title": "The Ancient Tome",
+            "description": "The Wizard senses dark energy from a recovered tome.",
+            "minTick": 200,
+            "requiredQuests": [
+              "tome"
+            ],
+            "consequences": [
+              "change_mood:anxious"
+            ]
+          }
         ]
       }
     ]
@@ -45,7 +143,8 @@
       "id": "guard",
       "name": "Guard Captain",
       "icon": "⚔",
-      "x": 27, "y": 26,
+      "x": 27,
+      "y": 26,
       "color": "#a0a0b0",
       "faction": "neutral",
       "questId": "wolves",
@@ -62,7 +161,8 @@
       "id": "innkeeper",
       "name": "Innkeeper Bram",
       "icon": "🍺",
-      "x": 31, "y": 27,
+      "x": 31,
+      "y": 27,
       "color": "#c08030",
       "faction": "friendly",
       "questId": "rats",
@@ -79,7 +179,8 @@
       "id": "blacksmith",
       "name": "Blacksmith Helga",
       "icon": "🔨",
-      "x": 33, "y": 29,
+      "x": 33,
+      "y": 29,
       "color": "#808880",
       "faction": "neutral",
       "questId": null,
@@ -96,7 +197,8 @@
       "id": "elder",
       "name": "Village Elder",
       "icon": "📜",
-      "x": 29, "y": 32,
+      "x": 29,
+      "y": 32,
       "color": "#d4a017",
       "faction": "friendly",
       "questId": "goblins",
@@ -113,7 +215,8 @@
       "id": "wizard",
       "name": "Old Wizard Mervyn",
       "icon": "🧙",
-      "x": 34, "y": 32,
+      "x": 34,
+      "y": 32,
       "color": "#a070e0",
       "faction": "friendly",
       "questId": "tome",
@@ -175,19 +278,168 @@
   ],
   "loot": {
     "monsters": [
-      { "id": "wolf",     "name": "Wolf",             "hp": 30,  "atk": 8,  "def": 3,  "xp": 15,  "gold": 3,   "color": "#8B5A2B", "icon": "🐺", "zone": "forest",   "drops": [{"itemId":"wolf_pelt","chance":0.7,"minQty":1,"maxQty":2}] },
-      { "id": "goblin",   "name": "Goblin",            "hp": 28,  "atk": 10, "def": 4,  "xp": 20,  "gold": 5,   "color": "#3a8a3a", "icon": "👺", "zone": "mountain", "drops": [{"itemId":"goblin_ear","chance":0.5,"minQty":1,"maxQty":1}] },
-      { "id": "rat",      "name": "Rat",               "hp": 15,  "atk": 5,  "def": 1,  "xp": 8,   "gold": 1,   "color": "#8a7060", "icon": "🐀", "zone": "dungeon",  "drops": [{"itemId":"rat_tail","chance":0.4,"minQty":1,"maxQty":1}] },
-      { "id": "skeleton", "name": "Skeleton",          "hp": 45,  "atk": 13, "def": 7,  "xp": 32,  "gold": 8,   "color": "#c8c8b0", "icon": "💀", "zone": "dungeon",  "drops": [{"itemId":"bone_fragment","chance":0.6,"minQty":1,"maxQty":3},{"itemId":"ancient_coin","chance":0.2,"minQty":1,"maxQty":1}] },
-      { "id": "boss",     "name": "Dungeon Overlord",  "hp": 200, "atk": 25, "def": 15, "xp": 300, "gold": 100, "color": "#a020a0", "icon": "👹", "zone": "dungeon",  "drops": [{"itemId":"overlord_crown","chance":1.0,"minQty":1,"maxQty":1},{"itemId":"ancient_coin","chance":1.0,"minQty":5,"maxQty":10}] }
+      {
+        "id": "wolf",
+        "name": "Wolf",
+        "hp": 30,
+        "atk": 8,
+        "def": 3,
+        "xp": 15,
+        "gold": 3,
+        "color": "#8B5A2B",
+        "icon": "🐺",
+        "zone": "forest",
+        "drops": [
+          {
+            "itemId": "wolf_pelt",
+            "chance": 0.7,
+            "minQty": 1,
+            "maxQty": 2
+          }
+        ]
+      },
+      {
+        "id": "goblin",
+        "name": "Goblin",
+        "hp": 28,
+        "atk": 10,
+        "def": 4,
+        "xp": 20,
+        "gold": 5,
+        "color": "#3a8a3a",
+        "icon": "👺",
+        "zone": "mountain",
+        "drops": [
+          {
+            "itemId": "goblin_ear",
+            "chance": 0.5,
+            "minQty": 1,
+            "maxQty": 1
+          }
+        ]
+      },
+      {
+        "id": "rat",
+        "name": "Rat",
+        "hp": 15,
+        "atk": 5,
+        "def": 1,
+        "xp": 8,
+        "gold": 1,
+        "color": "#8a7060",
+        "icon": "🐀",
+        "zone": "dungeon",
+        "drops": [
+          {
+            "itemId": "rat_tail",
+            "chance": 0.4,
+            "minQty": 1,
+            "maxQty": 1
+          }
+        ]
+      },
+      {
+        "id": "skeleton",
+        "name": "Skeleton",
+        "hp": 45,
+        "atk": 13,
+        "def": 7,
+        "xp": 32,
+        "gold": 8,
+        "color": "#c8c8b0",
+        "icon": "💀",
+        "zone": "dungeon",
+        "drops": [
+          {
+            "itemId": "bone_fragment",
+            "chance": 0.6,
+            "minQty": 1,
+            "maxQty": 3
+          },
+          {
+            "itemId": "ancient_coin",
+            "chance": 0.2,
+            "minQty": 1,
+            "maxQty": 1
+          }
+        ]
+      },
+      {
+        "id": "boss",
+        "name": "Dungeon Overlord",
+        "hp": 200,
+        "atk": 25,
+        "def": 15,
+        "xp": 300,
+        "gold": 100,
+        "color": "#a020a0",
+        "icon": "👹",
+        "zone": "dungeon",
+        "drops": [
+          {
+            "itemId": "overlord_crown",
+            "chance": 1,
+            "minQty": 1,
+            "maxQty": 1
+          },
+          {
+            "itemId": "ancient_coin",
+            "chance": 1,
+            "minQty": 5,
+            "maxQty": 10
+          }
+        ]
+      }
     ],
     "items": [
-      { "id": "wolf_pelt",      "name": "Wolf Pelt",       "icon": "🐺", "value": 5,  "type": "material", "description": "A rough wolf pelt. Useful for crafting." },
-      { "id": "goblin_ear",     "name": "Goblin Ear",      "icon": "👂", "value": 3,  "type": "material", "description": "Proof of a goblin kill." },
-      { "id": "rat_tail",       "name": "Rat Tail",        "icon": "🐀", "value": 1,  "type": "material", "description": "A disgusting rat tail." },
-      { "id": "bone_fragment",  "name": "Bone Fragment",   "icon": "🦴", "value": 2,  "type": "material", "description": "A fragment of ancient bone." },
-      { "id": "ancient_coin",   "name": "Ancient Coin",    "icon": "🪙", "value": 15, "type": "currency", "description": "A coin from a forgotten civilization." },
-      { "id": "overlord_crown", "name": "Overlord's Crown","icon": "👑", "value": 500,"type": "equipment","description": "The crown of the Dungeon Overlord. Radiates dark power." }
+      {
+        "id": "wolf_pelt",
+        "name": "Wolf Pelt",
+        "icon": "🐺",
+        "value": 5,
+        "type": "material",
+        "description": "A rough wolf pelt. Useful for crafting."
+      },
+      {
+        "id": "goblin_ear",
+        "name": "Goblin Ear",
+        "icon": "👂",
+        "value": 3,
+        "type": "material",
+        "description": "Proof of a goblin kill."
+      },
+      {
+        "id": "rat_tail",
+        "name": "Rat Tail",
+        "icon": "🐀",
+        "value": 1,
+        "type": "material",
+        "description": "A disgusting rat tail."
+      },
+      {
+        "id": "bone_fragment",
+        "name": "Bone Fragment",
+        "icon": "🦴",
+        "value": 2,
+        "type": "material",
+        "description": "A fragment of ancient bone."
+      },
+      {
+        "id": "ancient_coin",
+        "name": "Ancient Coin",
+        "icon": "🪙",
+        "value": 15,
+        "type": "currency",
+        "description": "A coin from a forgotten civilization."
+      },
+      {
+        "id": "overlord_crown",
+        "name": "Overlord's Crown",
+        "icon": "👑",
+        "value": 500,
+        "type": "equipment",
+        "description": "The crown of the Dungeon Overlord. Radiates dark power."
+      }
     ]
   }
 }
