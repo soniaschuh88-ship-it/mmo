@@ -9,6 +9,9 @@ members = [
     "bifrost/server",
     "bifrost/aigm",
     "bifrost/wac",
+    "bifrost/run",
+    "bifrost/synthesis",
+    "bifrost/safe-city",
     "nexus/voxel-kernel",
 ]
 
@@ -53,4 +56,7 @@ bifrost-witness  = { path = "bifrost/witness" }
 bifrost-physics  = { path = "bifrost/physics" }
 bifrost-server   = { path = "bifrost/server" }
 bifrost-wac      = { path = "bifrost/wac" }
+bifrost-run       = { path = "bifrost/run" }
+bifrost-synthesis  = { path = "bifrost/synthesis" }
+bifrost-safe-city  = { path = "bifrost/safe-city" }
 nexus-voxel-kernel = { path = "nexus/voxel-kernel" }

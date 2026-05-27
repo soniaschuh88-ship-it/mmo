@@ -1,0 +1,19 @@
+[package]
+name        = "bifrost-synthesis"
+description = "Synthesis AI Civilization — distributed strategic AI faction that competes against human players"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+uuid       = { workspace = true }
+rand       = { workspace = true }
+
+# Internal
+bifrost-wac = { workspace = true }
+bifrost-run = { workspace = true }
