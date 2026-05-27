@@ -9,6 +9,17 @@ use axum::{
 use serde_json::json;
 
 use bifrost_chunk::PeerId;
+use bifrost_run::end_condition::WorldSnapshot;
+use bifrost_run::run::{RunResult, RunState, WorldRun};
+use bifrost_synthesis::AiFaction;
+use bifrost_synthesis::tick::{SynthesisTick, TickInput};
+use bifrost_safe_city::auction::Listing;
+
+use crate::models::{
+    StartRunReq, RunTickReq, EndRunReq,
+    SynthesisInitReq, SynthesisTickReq,
+    PostListingReq, BuyListingReq, ZoneInfluenceReq,
+};
 use bifrost_lockstep::{LockstepScheduler, LockstepTick};
 use bifrost_physics::{PhysicsExecutor, PhysicsWorld};
 use bifrost_vis::{InstructionPayload, VoxelInstruction, VoxelProgram};
@@ -677,4 +688,279 @@ pub async fn nexus_demo(State(shared): State<SharedState>) -> impl IntoResponse 
         "chunks": results,
         "msg":    "Nexus voxel kernel: LLM → WAC → VoxelChunk pipeline working.",
     })).into_response()
+}
+
+// ─── Run System ───────────────────────────────────────────────────────────────
+
+/// `POST /run` — start a new world run epoch.
+///
+/// Creates a [`WorldRun`] from the request, registers it with the
+/// [`WorldRunDirector`], and transitions it to `Active` state.
+pub async fn start_run(
+    State(shared): State<SharedState>,
+    Json(req): Json<StartRunReq>,
+) -> impl IntoResponse {
+    let end_condition = match serde_json::from_value(req.end_condition) {
+        Ok(ec) => ec,
+        Err(e) => return bad!(format!("invalid end_condition: {e}")),
+    };
+    let run = WorldRun::new(
+        end_condition,
+        req.player_factions,
+        req.ai_factions,
+        req.world_seed,
+        req.label,
+    );
+    let mut s = shared.lock().await;
+    let tick = s.world.tick();
+    s.run_director.add_run(run);
+    s.run_director.start_next_run(tick);
+    match s.run_director.active_run() {
+        Some(r) => Json(json!({ "ok": true, "run": r })).into_response(),
+        None    => bad!("failed to activate run"),
+    }
+}
+
+/// `GET /run/current` — return the active world run, if any.
+pub async fn get_run(State(shared): State<SharedState>) -> impl IntoResponse {
+    let s = shared.lock().await;
+    match s.run_director.active_run() {
+        Some(r) => Json(json!({ "run": r })).into_response(),
+        None    => (StatusCode::NOT_FOUND, Json(json!({ "error": "no active run" }))).into_response(),
+    }
+}
+
+/// `POST /run/tick` — evaluate win conditions against a world snapshot.
+///
+/// Returns the run result if a win condition has been satisfied, otherwise
+/// `{"status": "continue"}`.
+pub async fn tick_run(
+    State(shared): State<SharedState>,
+    Json(req): Json<RunTickReq>,
+) -> impl IntoResponse {
+    let snap = WorldSnapshot {
+        current_tick:      req.current_tick,
+        zones_controlled:  req.zones_controlled,
+        tech_levels:       req.tech_levels,
+        economy_fractions: req.economy_fractions,
+    };
+    let mut s = shared.lock().await;
+    match s.run_director.evaluate_tick(req.current_tick, &snap) {
+        None      => Json(json!({ "status": "continue", "tick": req.current_tick })).into_response(),
+        Some(res) => Json(json!({
+            "status":          "run_ended",
+            "winner":          res.winner,
+            "losers":          res.losers,
+            "condition":       format!("{:?}", res.condition_triggered),
+            "summary":         res.summary,
+        })).into_response(),
+    }
+}
+
+/// `POST /run/end` — force-end the active run.
+pub async fn end_run(
+    State(shared): State<SharedState>,
+    Json(req): Json<EndRunReq>,
+) -> impl IntoResponse {
+    let mut s = shared.lock().await;
+    let tick = s.world.tick();
+    match s.run_director.active_run_mut() {
+        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "no active run" }))).into_response(),
+        Some(run) => {
+            let result = RunResult::draw(
+                run.end_condition.clone(),
+                run.player_factions.iter().chain(run.ai_factions.iter()).cloned().collect(),
+            );
+            run.state    = RunState::Ended(result);
+            run.end_tick = Some(tick);
+            let id = run.id;
+            Json(json!({
+                "ok":     true,
+                "run_id": id,
+                "winner": req.winner_faction_id,
+                "reason": req.reason,
+                "ended_at_tick": tick,
+            })).into_response()
+        }
+    }
+}
+
+/// `GET /run/history` — all runs (active and completed).
+pub async fn run_history(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let runs = &s.run_director.runs;
+    Json(json!({
+        "runs":  runs,
+        "count": runs.len(),
+    }))
+}
+
+// ─── Synthesis AI ─────────────────────────────────────────────────────────────
+
+/// `POST /synthesis/init` — create (or reset) the Synthesis AI faction.
+pub async fn synthesis_init(
+    State(shared): State<SharedState>,
+    Json(req): Json<SynthesisInitReq>,
+) -> impl IntoResponse {
+    let faction = AiFaction::new(req.faction_id, req.display_name);
+    let mut s = shared.lock().await;
+    let resp = json!({
+        "ok":      true,
+        "faction": faction,
+    });
+    s.synthesis = Some(faction);
+    Json(resp).into_response()
+}
+
+/// `GET /synthesis/faction` — return the Synthesis AI faction state.
+pub async fn synthesis_faction(State(shared): State<SharedState>) -> impl IntoResponse {
+    let s = shared.lock().await;
+    match &s.synthesis {
+        None    => (StatusCode::NOT_FOUND, Json(json!({ "error": "synthesis AI not initialised — POST /synthesis/init first" }))).into_response(),
+        Some(f) => Json(json!({ "faction": f })).into_response(),
+    }
+}
+
+/// `POST /synthesis/tick` — run one Synthesis AI tick and return emitted intents.
+pub async fn synthesis_tick(
+    State(shared): State<SharedState>,
+    Json(req): Json<SynthesisTickReq>,
+) -> impl IntoResponse {
+    let input = TickInput {
+        tick:                    req.current_tick,
+        zone_resources:          req.owned_zones.iter()
+            .map(|z| (z.clone(), 0.5f32))
+            .collect(),
+        player_fortresses:       std::collections::BTreeMap::new(),
+        player_economy_fraction: 1.0 - req.threat_level.clamp(0.0, 1.0),
+    };
+    let mut s = shared.lock().await;
+    match &mut s.synthesis {
+        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "synthesis AI not initialised — POST /synthesis/init first" }))).into_response(),
+        Some(faction) => {
+            let mut ticker = SynthesisTick::new(faction);
+            let output = ticker.run(input);
+            Json(json!({
+                "tick":    req.current_tick,
+                "intents": output.intents,
+                "goals":   output.goals,
+                "intent_count": output.intents.len(),
+            })).into_response()
+        }
+    }
+}
+
+/// `GET /synthesis/agents` — list current Synthesis agent nodes.
+pub async fn synthesis_agents(State(shared): State<SharedState>) -> impl IntoResponse {
+    let s = shared.lock().await;
+    match &s.synthesis {
+        None    => (StatusCode::NOT_FOUND, Json(json!({ "error": "synthesis AI not initialised" }))).into_response(),
+        Some(f) => Json(json!({ "agents": f.agents, "count": f.agents.len() })).into_response(),
+    }
+}
+
+// ─── Safe City + Economy ──────────────────────────────────────────────────────
+
+/// `GET /safe-city` — return Safe City state and market summary.
+pub async fn safe_city_info(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    Json(json!({
+        "zone_id":          s.safe_city.zone_id,
+        "protection_level": s.safe_city.protection_level,
+        "allowed_actions":  s.safe_city.allowed_actions,
+        "active_listings":  s.safe_city.market.listings.len(),
+    }))
+}
+
+/// `GET /safe-city/auction` — list all active auction listings.
+pub async fn auction_listings(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let active: Vec<_> = s.safe_city.market.listings.iter()
+        .filter(|l| matches!(l.status, bifrost_safe_city::auction::ListingStatus::Active))
+        .collect();
+    Json(json!({
+        "listings": active,
+        "count": active.len(),
+        "tax_policy": s.safe_city.market.tax_policy,
+    }))
+}
+
+/// `POST /safe-city/auction/list` — post a new fixed-price listing.
+pub async fn post_listing(
+    State(shared): State<SharedState>,
+    Json(req): Json<PostListingReq>,
+) -> impl IntoResponse {
+    let listing = Listing::new_fixed(
+        req.seller_id,
+        req.item_id,
+        req.item_name,
+        req.quantity,
+        req.unit_price,
+        req.current_tick,
+    );
+    let mut s = shared.lock().await;
+    let id = s.safe_city.market.post(listing);
+    Json(json!({ "ok": true, "listing_id": id })).into_response()
+}
+
+/// `POST /safe-city/auction/buy` — purchase quantity of a listing.
+pub async fn buy_listing(
+    State(shared): State<SharedState>,
+    Json(req): Json<BuyListingReq>,
+) -> impl IntoResponse {
+    let id = match uuid::Uuid::parse_str(&req.listing_id) {
+        Ok(u)  => u,
+        Err(_) => return bad!("listing_id must be a valid UUID"),
+    };
+    let mut s = shared.lock().await;
+    match s.safe_city.market.buy(id, &req.buyer_id, req.budget) {
+        Ok(receipt) => Json(json!({ "ok": true, "receipt": receipt })).into_response(),
+        Err(e)      => (StatusCode::UNPROCESSABLE_ENTITY,
+                        Json(json!({ "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// `GET /safe-city/zones` — return all world zones.
+pub async fn list_zones(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let zones: Vec<_> = s.zones.values().collect();
+    Json(json!({ "zones": zones, "count": zones.len() }))
+}
+
+/// `GET /safe-city/zones/:id` — return a single zone by ID.
+pub async fn get_zone(
+    State(shared): State<SharedState>,
+    Path(zone_id): Path<String>,
+) -> impl IntoResponse {
+    let s = shared.lock().await;
+    match s.zones.get(&zone_id) {
+        None    => (StatusCode::NOT_FOUND, Json(json!({ "error": format!("zone '{zone_id}' not found") }))).into_response(),
+        Some(z) => Json(json!({ "zone": z })).into_response(),
+    }
+}
+
+/// `POST /safe-city/zones/:id/influence` — apply faction influence delta to a zone.
+///
+/// Influence accumulates per faction.  When it reaches 1.0 the zone
+/// transitions to `Controlled` state automatically.
+pub async fn zone_influence(
+    State(shared): State<SharedState>,
+    Path(zone_id): Path<String>,
+    Json(req): Json<ZoneInfluenceReq>,
+) -> impl IntoResponse {
+    let mut s = shared.lock().await;
+    match s.zones.get_mut(&zone_id) {
+        None => (StatusCode::NOT_FOUND, Json(json!({ "error": format!("zone '{zone_id}' not found") }))).into_response(),
+        Some(zone) => {
+            zone.apply_influence(&req.faction_id, req.delta);
+            Json(json!({
+                "ok":       true,
+                "zone_id":  zone_id,
+                "faction":  req.faction_id,
+                "delta":    req.delta,
+                "state":    zone.state,
+                "influence": zone.influence,
+            })).into_response()
+        }
+    }
 }

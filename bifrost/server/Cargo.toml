@@ -27,5 +27,9 @@ bifrost-chunk    = { workspace = true }
 bifrost-lockstep = { workspace = true }
 bifrost-witness  = { workspace = true }
 bifrost-physics  = { workspace = true }
-bifrost-wac      = { workspace = true }
+bifrost-wac       = { workspace = true }
+bifrost-run       = { workspace = true }
+bifrost-synthesis = { workspace = true }
+bifrost-safe-city = { workspace = true }
 nexus-voxel-kernel = { workspace = true }
+uuid = { workspace = true }

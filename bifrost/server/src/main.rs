@@ -85,6 +85,25 @@ async fn main() {
         .route("/nexus/chunk/:x/:y/:z",get(api::nexus_chunk))
         .route("/nexus/world",         get(api::nexus_world_stats))
         .route("/nexus/demo",          post(api::nexus_demo))
+        // Run System — discrete world epoch lifecycle
+        .route("/run",                 post(api::start_run))
+        .route("/run/current",         get(api::get_run))
+        .route("/run/tick",            post(api::tick_run))
+        .route("/run/end",             post(api::end_run))
+        .route("/run/history",         get(api::run_history))
+        // Synthesis AI — Synthesis faction tick + state
+        .route("/synthesis/init",      post(api::synthesis_init))
+        .route("/synthesis/faction",   get(api::synthesis_faction))
+        .route("/synthesis/tick",      post(api::synthesis_tick))
+        .route("/synthesis/agents",    get(api::synthesis_agents))
+        // Safe City — economy, auction house, zone control
+        .route("/safe-city",                          get(api::safe_city_info))
+        .route("/safe-city/auction",                  get(api::auction_listings))
+        .route("/safe-city/auction/list",             post(api::post_listing))
+        .route("/safe-city/auction/buy",              post(api::buy_listing))
+        .route("/safe-city/zones",                    get(api::list_zones))
+        .route("/safe-city/zones/:id",                get(api::get_zone))
+        .route("/safe-city/zones/:id/influence",      post(api::zone_influence))
         // Shared state + CORS (allow all for development)
         .with_state(shared)
         .layer(CorsLayer::permissive());

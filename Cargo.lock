@@ -188,6 +188,9 @@ dependencies = [
  "bifrost-chunk",
  "bifrost-lockstep",
  "bifrost-physics",
+ "bifrost-run",
+ "bifrost-safe-city",
+ "bifrost-synthesis",
  "bifrost-vis",
  "bifrost-wac",
  "bifrost-witness",
@@ -200,6 +203,7 @@ dependencies = [
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

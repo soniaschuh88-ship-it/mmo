@@ -7,7 +7,11 @@ use bifrost_lockstep::LockstepScheduler;
 use bifrost_physics::PhysicsWorld;
 use bifrost_witness::WitnessExecutor;
 use bifrost_wac::{AssetCache, WorldDirector};
+use bifrost_run::WorldRunDirector;
+use bifrost_synthesis::AiFaction;
+use bifrost_safe_city::{SafeCity, Zone, ZoneId, ZoneState, ResourceMap};
 use nexus_voxel_kernel::bridge::RuntimeAdapter;
+use std::collections::BTreeMap;
 use tokio::sync::Mutex;
 
 /// The live simulation state shared across all HTTP handlers.
@@ -32,10 +36,45 @@ pub struct SimState {
     // ── Nexus Voxel Kernel ────────────────────────────────────────────────────
     /// Nexus WAC runtime: LLM/AI → VoxelChunk pipeline.
     pub nexus_rt:       RuntimeAdapter,
+
+    // ── Run System (bifrost-run) ──────────────────────────────────────────────
+    /// Run director: tracks win conditions and emits world-mutation blueprints.
+    /// Active run is available via `run_director.runs` / `active_run()`.
+    pub run_director:   WorldRunDirector,
+
+    // ── Synthesis AI (bifrost-synthesis) ─────────────────────────────────────
+    /// The active Synthesis AI faction (one per server for now).
+    pub synthesis:      Option<AiFaction>,
+
+    // ── Safe City + Economy (bifrost-safe-city) ───────────────────────────────
+    /// The safe city anchor zone (contains the embedded AuctionHouse market).
+    pub safe_city:      SafeCity,
+    /// All active world zones keyed by zone ID.
+    pub zones:          BTreeMap<ZoneId, Zone>,
 }
 
 impl SimState {
     pub fn new() -> Self {
+        // Seed a few starting zones so the API has data immediately.
+        let mut zones: BTreeMap<ZoneId, Zone> = BTreeMap::new();
+
+        zones.insert("safe-city".into(), Zone::safe("safe-city", "plains"));
+
+        for (id, biome, risk) in [
+            ("outer-east", "forest",  1u8),
+            ("outer-west", "desert",  1),
+            ("deep-north", "dungeon", 2),
+        ] {
+            zones.insert(id.into(), Zone {
+                id:        id.into(),
+                state:     ZoneState::Contested { leader: None, contest_strength: 0.0 },
+                biome_id:  biome.into(),
+                resources: ResourceMap::new(),
+                influence: BTreeMap::new(),
+                risk_tier: risk,
+            });
+        }
+
         Self {
             scheduler:      LockstepScheduler::new(50),
             world:          PhysicsWorld::new(),
@@ -45,6 +84,10 @@ impl SimState {
             asset_cache:    AssetCache::new(),
             director:       WorldDirector::default(),
             nexus_rt:       RuntimeAdapter::new(),
+            run_director:   WorldRunDirector::new(),
+            synthesis:      None,
+            safe_city:      SafeCity::new(String::from("safe-city")),
+            zones,
         }
     }
 
