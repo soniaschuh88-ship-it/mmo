@@ -1,4 +1,4 @@
-# Bifrost Protocol Specification
+# bKG — Bifrost Protocol Specification
 
 > Bifrost connects DELPHOS (truth authority) to the MMO Fabric (distributed compute).
 
@@ -22,10 +22,8 @@
 
 ### VoxelProgram Hash
 
-A `VoxelProgram` is a sequence of instructions, hashed with BLAKE3:
-
 ```
-program_hash = BLAKE3(concat(instruction_hashes))
+program_hash     = BLAKE3(concat(instruction_hashes))
 instruction_hash = BLAKE3(opcode || epoch || payload_bytes)
 ```
 
@@ -37,23 +35,19 @@ All peers must produce identical `instruction_hash` for the same instruction.
 
 ### Chunk Coordinate System
 
-Chunks are identified by `(x, y, z, lod)` where:
-- `x,y,z` are chunk grid coordinates (each chunk = 64×64×64 voxels)
-- `lod` is the level-of-detail tier (0 = full, 1 = half, etc.)
+Chunks are identified by `(x, y, z, lod)`:
+- `x,y,z` — chunk grid coordinates (each chunk = 64×64×64 voxels)
+- `lod` — level-of-detail tier (0 = full resolution)
 
 ### Authority Rotation
 
-Every `epoch_duration_ticks` (default: 1000 ticks), the chunk authority rotates:
+Every `epoch_duration_ticks` (default: 1000 ticks):
 
 ```
-new_authority = peer_pool[(epoch_number % len(peer_pool))]
+new_authority = peer_pool[epoch_number % len(peer_pool)]
 ```
-
-This prevents any single peer from controlling a chunk indefinitely.
 
 ### Epoch Boundary
-
-An `EpochBoundary` is a signed checkpoint:
 
 ```
 EpochBoundary {
@@ -72,8 +66,6 @@ The `final_state_hash` is the replay anchor for new authorities.
 
 ## 3. Lockstep Tick Protocol
 
-### Tick Advance Rule
-
 **Tick N+1 starts only when all registered peers have acknowledged Tick N.**
 
 ```
@@ -85,12 +77,10 @@ Slow peers cause backpressure. Unresponsive peers are evicted after timeout.
 
 ### InputBuffer
 
-Each peer submits their `VoxelProgram` for a tick before the barrier is released:
+Each peer submits their `VoxelProgram` before the barrier is released:
 
 ```
-InputBuffer[tick] = {
-    peer_id → VoxelProgram
-}
+InputBuffer[tick] = { peer_id → VoxelProgram }
 ```
 
 The merged program for tick N is the deterministic sort of all peer programs.
@@ -104,47 +94,52 @@ The merged program for tick N is the deterministic sort of all peer programs.
 | Role | Count | Responsibility |
 |---|---|---|
 | Authority | 1 | Executes tick, produces reference hash |
-| Witness | 2 | Independent execution, vote on hash |
+| Witness | 2 | Independent execution, votes on hash |
 | Advisory | N | Soft votes, trust signal (non-binding) |
 
 ### Consensus Rules
 
 ```
-ACCEPTED:   authority_hash == witness_1_hash == witness_2_hash
-CONTESTED:  any mismatch among authority + witnesses
-PENDING:    waiting for votes
+ACCEPTED:  authority_hash == witness_1_hash == witness_2_hash
+CONTESTED: any mismatch among authority + witnesses
+PENDING:   waiting for votes
 ```
 
 ### Contested Resolution
 
 1. Record mismatched peer IDs
 2. Identify `replay_from_tick` (last accepted tick)
-3. Promote a new witness from advisory pool
+3. Promote new witness from advisory pool
 4. Reduce trust score of mismatching peer
 5. Replay from `replay_from_tick` with new quorum
 
 ---
 
-## 5. Deterministic Physics Contract
+## 5. Determinism Contract
 
 All peers MUST produce identical physics output for identical inputs.
 
-### Guarantees
+| Rule | Detail |
+|---|---|
+| No `HashMap` | Use `BTreeMap` for stable iteration order |
+| No `SystemTime` | Use tick number as time reference |
+| No `f32` accumulation | Use `f64` with deterministic rounding |
+| No OS-specific behavior | Pure computation only |
+| WASM-compilable | Same binary on browser, desktop, mobile, edge |
+| **Same seed = same world** | quintic smoothstep in both Rust and JS |
 
-- No `HashMap` — use `BTreeMap` for stable iteration order
-- No `SystemTime` — use tick number as time reference
-- No `f32` accumulation — use `f64` with deterministic rounding contract
-- No OS-specific behavior — pure computation only
-- WASM-compilable — same binary on browser, desktop, mobile, edge
+### WASM Interface
 
-### WASM Interface (Future)
-
-```
+```rust
 fn execute_physics_tick(
-    world_state: &[u8],   // CBOR-encoded PhysicsWorld
-    instructions: &[u8],  // CBOR-encoded Vec<VoxelInstruction>
-) -> Vec<u8>              // CBOR-encoded (new_world_state, state_hash)
+    world_state:  &[u8],   // CBOR-encoded PhysicsWorld
+    instructions: &[u8],   // CBOR-encoded Vec<VoxelInstruction>
+) -> Vec<u8>               // CBOR-encoded (new_world_state, state_hash)
 ```
 
-This interface allows the browser to run **identical physics** to the server,
-enabling witness verification without server involvement.
+---
+
+## See Also
+
+- [`engine/architecture.md`](architecture.md) — System overview
+- [`api/usage.md`](../api/usage.md) — curl examples for all endpoints
