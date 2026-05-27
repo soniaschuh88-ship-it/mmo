@@ -169,9 +169,9 @@ mod tests {
             blueprint_id: b.id,
             ir_version:   1,
             semantic_hash: [0u8; 32],
-            asset: crate::types::CompiledAsset::VoxelChunk(crate::types::VoxelChunkIR {
-                id: "x".into(), size: (1,1,1), seed: 1,
-                material_palette: vec![], blocks: vec![],
+            asset: crate::types::CompiledAsset::TileMap(crate::types::TileMapIR {
+                id: "x".into(), size: (1, 1), seed: 1,
+                tile_palette: vec!["empty".into()], tiles: vec![0],
             }),
         };
         cache.insert(&b, dummy_ir.clone());
@@ -183,9 +183,10 @@ mod tests {
         let mut cache = AssetCache::new();
         let make_ir = |b: &AssetBlueprint| crate::types::AssetIR {
             blueprint_id: b.id,
-            ir_version: 1, semantic_hash: [0u8;32],
-            asset: crate::types::CompiledAsset::VoxelChunk(crate::types::VoxelChunkIR {
-                id:"x".into(), size:(1,1,1), seed:1, material_palette:vec![], blocks:vec![],
+            ir_version: 2, semantic_hash: [0u8; 32],
+            asset: crate::types::CompiledAsset::TileMap(crate::types::TileMapIR {
+                id: "x".into(), size: (1, 1), seed: 1,
+                tile_palette: vec!["empty".into()], tiles: vec![0],
             }),
         };
         for i in 0..CACHE_CAPACITY {

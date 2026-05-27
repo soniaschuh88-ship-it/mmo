@@ -17,6 +17,9 @@ pub enum WacError {
     #[error("natural_language_spec must not be empty")]
     EmptySpec,
 
+    #[error("invalid tile map rule: {0}")]
+    InvalidTileMapRule(String),
+
     #[error("invalid biome rule: {0}")]
     InvalidBiomeRule(String),
 
@@ -54,12 +57,41 @@ pub fn validate(bp: &AssetBlueprint) -> Result<(), WacError> {
 
     // Per-type rules
     match bp.asset_type {
+        AssetIntent::TileMap         => validate_tilemap(bp),
         AssetIntent::BiomeDefinition => validate_biome(bp),
         AssetIntent::LootTable       => validate_loot(bp),
         AssetIntent::AnimationGraph  => validate_animation(bp),
         AssetIntent::EntityPrefab    => validate_entity(bp),
-        AssetIntent::TileMap          => Ok(()), // 2-D tile map layout — minimal validation
     }
+}
+
+// ─── TileMap ──────────────────────────────────────────────────────────────────
+
+fn validate_tilemap(bp: &AssetBlueprint) -> Result<(), WacError> {
+    // Must mention at least one spatial keyword so the compiler can choose a theme.
+    let spec_lower = bp.natural_language_spec.to_lowercase();
+    let spatial_words = ["dungeon","cave","forest","plains","desert","snow","swamp",
+                         "mountain","village","castle","base","fortress","map","layout",
+                         "town","field","area","zone","region"];
+    if !spatial_words.iter().any(|w| spec_lower.contains(w)) {
+        return Err(WacError::InvalidTileMapRule(
+            "spec must contain at least one spatial keyword \
+             (dungeon, forest, plains, village, …)".into(),
+        ));
+    }
+    // Validate optional size constraint syntax.
+    for c in &bp.constraints {
+        if c.to_lowercase().starts_with("size") {
+            // Accept "size = WxH" — parse is lenient, just validate format exists.
+            let rest = c.trim_start_matches(|ch: char| ch.is_alphanumeric() || ch == ' ' || ch == '=');
+            if !rest.contains('x') {
+                return Err(WacError::ConstraintParse(
+                    format!("size constraint must be 'size = WxH', got: '{c}'"),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 // ─── Biome ────────────────────────────────────────────────────────────────────

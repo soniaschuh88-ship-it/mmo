@@ -1,6 +1,6 @@
 [package]
 name        = "bifrost-wac"
-description = "World Asset Compiler — text → validated, deterministic asset IR"
+description = "World Asset Compiler — text → validated, deterministic 2-D asset IR"
 version.workspace    = true
 edition.workspace    = true
 license.workspace    = true
@@ -15,6 +15,15 @@ thiserror  = { workspace = true }
 uuid       = { workspace = true }
 rand       = { workspace = true }
 hex        = { workspace = true }
+
+# NVIDIA NIM — optional; enabled by the `nvidia-nim` feature.
+# Uses blocking reqwest so WAC stays synchronous (no async runtime needed).
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["json", "blocking"] }
+
+[features]
+# Enable the NVIDIA NIM API client for LLM-backed asset spec generation.
+# Required for Synthesis AI faction real-time world generation.
+nvidia-nim = ["dep:reqwest"]
 
 [dev-dependencies]
 # nothing extra needed for unit tests
