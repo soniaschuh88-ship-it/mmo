@@ -15,5 +15,6 @@ uuid       = { workspace = true }
 rand       = { workspace = true }
 
 # Internal
-bifrost-wac = { workspace = true }
-bifrost-run = { workspace = true }
+bifrost-wac    = { workspace = true }
+bifrost-run    = { workspace = true }
+bifrost-kernel = { workspace = true }

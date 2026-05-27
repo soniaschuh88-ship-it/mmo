@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "bifrost/kernel",
     "bifrost/vis",
     "bifrost/chunk",
     "bifrost/lockstep",
@@ -56,6 +57,7 @@ getrandom   = { version = "0.2", features = ["js"] }
 
 # Internal crates
 bifrost-vis      = { path = "bifrost/vis" }
+bifrost-kernel   = { path = "bifrost/kernel" }
 bifrost-chunk    = { path = "bifrost/chunk" }
 bifrost-lockstep = { path = "bifrost/lockstep" }
 bifrost-witness  = { path = "bifrost/witness" }

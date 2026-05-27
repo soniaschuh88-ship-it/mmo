@@ -141,6 +141,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bifrost-kernel"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "bifrost-lockstep"
 version = "0.1.0"
 dependencies = [
