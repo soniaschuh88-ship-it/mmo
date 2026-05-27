@@ -13,6 +13,8 @@ serde_json  = { workspace = true }
 blake3      = { workspace = true }
 hex         = { workspace = true }
 thiserror   = { workspace = true }
+# R1 — BiomeIR is defined once in bifrost-wac (world type authority)
+bifrost-wac   = { workspace = true }
 # Bifrost integration (optional — kernel is usable standalone)
 bifrost-vis   = { workspace = true, optional = true }
 bifrost-chunk = { workspace = true, optional = true }

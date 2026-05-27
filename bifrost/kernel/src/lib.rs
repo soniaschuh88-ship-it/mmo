@@ -25,5 +25,5 @@ pub mod transition;
 pub use clock::SequencedInstant;
 pub use ids::{FactionId, ZoneId};
 pub use ledger::Ledger;
-pub use pipeline::{EventPipeline, PipelineError};
+pub use pipeline::{EventPipeline, PipelineError, RawEvent};
 pub use transition::{ApplyTransition, StateTransitionFn};

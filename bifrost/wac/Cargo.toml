@@ -15,6 +15,8 @@ thiserror  = { workspace = true }
 uuid       = { workspace = true }
 rand       = { workspace = true }
 hex        = { workspace = true }
+# Step 4: WAC acts as a behavior compiler — AnimIR → nova-anim runtime FSM.
+nova-anim  = { workspace = true }
 
 # NVIDIA NIM — optional; enabled by the `nvidia-nim` feature.
 # Uses blocking reqwest so WAC stays synchronous (no async runtime needed).

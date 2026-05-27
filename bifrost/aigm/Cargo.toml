@@ -13,6 +13,8 @@ serde_json  = { workspace = true }
 blake3      = { workspace = true }
 thiserror   = { workspace = true }
 uuid        = { workspace = true }
+bifrost-kernel = { workspace = true }
+nova-core      = { workspace = true }
 
 [features]
 # Expose test helpers (e.g. event builders, mock registries)

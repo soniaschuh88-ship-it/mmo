@@ -71,7 +71,7 @@ impl QuestRegistry {
                         &p.giver_npc_id,
                         objectives,
                         reward,
-                        event.seq,
+                        event.instant.seq,
                         p.expires_at,
                         &p.ai_context,
                     );
@@ -209,6 +209,7 @@ fn obj_from_payload(p: &QuestObjectivePayload) -> QuestObjective {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bifrost_kernel::SequencedInstant;
     use crate::event::{
         AuthorId, EventPayload, EventType, QuestCreatePayload,
         QuestObjectivePayload, QuestOutcomePayload, QuestRewardPayload,
@@ -219,7 +220,7 @@ mod tests {
 
     fn create_event(seq: u64, quest_id: &str, prev: &[u8; 32]) -> WorldEvent {
         WorldEvent::new(
-            seq,
+            SequencedInstant::new(0, seq),
             EventType::AigmQuestCreate,
             EventPayload::AigmQuestCreate(QuestCreatePayload {
                 quest_id:    quest_id.into(),
@@ -255,7 +256,7 @@ mod tests {
 
     fn update_event(seq: u64, quest_id: &str, progress: u32, prev: &[u8; 32]) -> WorldEvent {
         WorldEvent::new(
-            seq,
+            SequencedInstant::new(0, seq),
             EventType::AigmQuestUpdate,
             EventPayload::AigmQuestUpdate(QuestUpdatePayload {
                 quest_id: quest_id.into(),
@@ -273,7 +274,7 @@ mod tests {
 
     fn complete_event(seq: u64, quest_id: &str, prev: &[u8; 32]) -> WorldEvent {
         WorldEvent::new(
-            seq,
+            SequencedInstant::new(0, seq),
             EventType::AigmQuestComplete,
             EventPayload::AigmQuestComplete(QuestOutcomePayload {
                 quest_id: quest_id.into(),

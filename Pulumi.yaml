@@ -1,7 +1,3 @@
 name: container-gcp-typescript
-description: A TypeScript program to deploy a containerized service on Google Cloud
+description: NOVA MMO — bifrost-server + bifrost-wasm deployed to Azure Container Apps
 runtime: nodejs
-config:
-  pulumi:tags:
-    value:
-      pulumi:template: tree/HEAD/container-gcp-typescript

@@ -1,0 +1,21 @@
+[package]
+name        = "bifrost-wasm"
+description = "WASM bridge — exposes world generation and biome data to the browser"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+# Both `cdylib` (for wasm-pack) and `rlib` (for native unit tests).
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = { workspace = true }
+serde_json   = { workspace = true }
+# bifrost-wac provides BiomeKey, BIOME_COLORS, BiomeRegistry.
+bifrost-wac  = { workspace = true }
+# nexus-voxel-kernel provides the quintic-smoothstep noise functions
+# that exactly match the JS `sn()` / `fbm()` in game.html.
+nexus-voxel-kernel = { workspace = true }

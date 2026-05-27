@@ -249,6 +249,16 @@ const OBJ=Array.from({length:W},()=>new Uint8Array(W)); // 0=none,1=tree,2=rock,
 const SEED=42,CX=W/2,CY=W/2;
 const spNPC=[],spMon=[];
 
+// ── Terraria 2D cross-section terrain (R4: same seed → same world) ──────────
+const TERR_H=80;          // depth rows
+const TS=14;              // tile size in pixels for Terraria mode
+const TERR=Array.from({length:TERR_H},()=>new Uint8Array(W));
+const SURF=new Uint8Array(W);  // surface row for each column
+let renderMode='terraria'; // 'iso' | 'terraria' — switched per zone
+let P_ty=30;               // player depth position in Terraria mode
+let P_vy=0;                // vertical velocity
+const GRAVITY=22, JUMP_FORCE=9.5;
+
 const MDEF={
   wolf:    {name:'Wolf',      hp:35, maxHp:35, atk:9, def:3, xp:18,gold:4, col:'#8B5A2B',icon:'🐺',zone:[3,4]},
   goblin:  {name:'Goblin',    hp:32, maxHp:32, atk:11,def:5, xp:22,gold:6, col:'#3a8a3a',icon:'👺',zone:[6,7]},
@@ -369,12 +379,15 @@ function genWorld(){
       anim:'idle',animF:0,animT:0,facing:0,moving:false,
     });
   }
+  // Generate Terraria cross-section from the same seed (R4 determinism).
+  genTerrainCrossSection();
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // QUEST CHAINS
+// Populated from /aigm/quests on startup; falls back to bundled data.
 // ═══════════════════════════════════════════════════════════════════
-const QCHAINS={
+let QCHAINS={
   chain_guard:{
     stages:[
       {id:'g1',title:'Wolf Menace',    icon:'🐺',target:'wolf',   count:5, gold:40,xp:80, who:'Guard Captain Aldric',
@@ -683,6 +696,8 @@ function initGame(name,cls){
   skillsU={};hotbar=[null,null,null,null];
   inventory=[];groundItems=[];equipped={wpn:null,arm:null,acc:null};
   npcs=[...spNPC];
+  // Initialize Terraria position to surface at player's starting column.
+  initTerrariaPos();
   monsters=spMon.map(m=>({...m,hp:m.maxHp,alive:true,animHit:0,stunUntil:0,missCount:0,
     anim:'idle',animF:0,animT:0,facing:0,moving:false}));
   updateHUD();buildHotbar();renderMinimap();
@@ -691,6 +706,57 @@ function initGame(name,cls){
 }
 
 let serverBiomes=[];
+
+// ── Server data fetch helpers ─────────────────────────────────────
+// Each function updates global state from the bifrost-server API.
+// Falls back silently when the server is offline (standalone mode).
+
+async function fetchQuests(){
+  // R3: quests are now server-authoritative.
+  // On success, QCHAINS is replaced with the server's canonical definitions.
+  // On failure, the bundled fallback above remains in effect.
+  try{
+    const r=await fetch('/api/aigm/quests');
+    if(r.ok){
+      const d=await r.json();
+      if(d.chains&&Object.keys(d.chains).length>0)QCHAINS=d.chains;
+    }
+  }catch(_){}
+}
+
+async function fetchNpcs(){
+  // Server returns NPC positions; we merge with our visual table.
+  // Visual data (icon, col, questId, lines) lives client-side — server owns state.
+  const NPC_VISUAL={
+    guard:   {col:'#a0a0b8',icon:'⚔',questId:'chain_guard',
+      lines:["Wolves have been terrorizing the northern farms.","We must stop them before the harvest fails."]},
+    innkeep: {col:'#c08030',icon:'🍺',questId:'chain_inn',
+      lines:["Giant rats, then something worse in my cellar!","I heard chanting down there last night."]},
+    elder:   {col:'#d4a017',icon:'📜',questId:'chain_elder',
+      lines:["An ancient tome speaks of a coming darkness.","We must decipher it before it's too late."]},
+    wizard:  {col:'#9060e0',icon:'🧙',questId:'chain_wiz',
+      lines:["The dungeon holds power beyond imagination.","But also the Lich — the architect of despair."]},
+    smith:   {col:'#808888',icon:'🔨',questId:null,
+      lines:["Need weapons? I've got the finest steel.","Stay sharp out there — the wilds are deadly."]},
+    healer:  {col:'#60c080',icon:'💚',questId:null,
+      lines:["Come to me if you need healing.","The forest grows darker each day."]},
+  };
+  try{
+    const r=await fetch('/api/aigm/npcs');
+    if(r.ok){
+      const d=await r.json();
+      if(d.npcs&&d.npcs.length>0){
+        // Replace spNPC entries with server positions, keeping client visual data.
+        spNPC.length=0;
+        for(const n of d.npcs){
+          const v=NPC_VISUAL[n.id]||{col:'#888',icon:'?',questId:null,lines:[]};
+          spNPC.push({id:n.id,wx:n.wx,wy:n.wy,name:n.name,...v,hp:n.hp,maxHp:n.hp_max,alive:n.alive});
+        }
+      }
+    }
+  }catch(_){}
+}
+
 async function fetchServerStatus(){
   try{
     const r=await fetch('/api/health');
@@ -701,6 +767,8 @@ async function fetchServerStatus(){
       if(br.ok){const bd=await br.json();serverBiomes=bd.biomes||[];}
       // Fetch nexus demo in background
       fetch('/api/nexus/demo',{method:'POST'}).catch(()=>{});
+      // Fetch server-authoritative quest chains + NPC positions (R3).
+      await Promise.all([fetchQuests(), fetchNpcs()]);
     }
   }catch(_){/* server offline — game still works standalone */}
 }
@@ -1691,16 +1759,249 @@ document.getElementById('btn-sk').addEventListener('click',toggleSkills);
 document.getElementById('sk-close').addEventListener('click',()=>document.getElementById('sk-ov').classList.remove('on'));
 
 // ═══════════════════════════════════════════════════════════════════
+// TERRARIA 2D SIDE-SCROLL (outdoor exploration mode)
+// Indoor zones (village, building, dungeon) use the isometric view above.
+// Outdoor zones (grass, forest, sand, …) use this Terraria side-scroll.
+// ═══════════════════════════════════════════════════════════════════
+
+// Generate the vertical terrain cross-section from the same SEED as BM/HM.
+function genTerrainCrossSection(){
+  for(let x=0;x<W;x++){
+    // Surface row: halfway down, modulated by the same noise as HM.
+    const noiseH=fbm(x*.045,CY*.045,6,SEED);
+    const s=Math.floor(TERR_H*.35+(1-noiseH)*TERR_H*.3);
+    SURF[x]=Math.max(5,Math.min(TERR_H-20,s));
+    const bm_biome=BM[Math.floor(CY)][x]||BIOME.grass;
+    for(let y=0;y<TERR_H;y++){
+      if(y<SURF[x]){
+        TERR[y][x]=0;  // sky/air
+      }else if(y===SURF[x]){
+        TERR[y][x]=bm_biome;  // surface biome
+      }else if(y<SURF[x]+3){
+        // Topsoil: grass→rock transition
+        TERR[y][x]=(bm_biome===BIOME.sand||bm_biome===BIOME.deep_water)?bm_biome:BIOME.rock;
+      }else if(y<SURF[x]+15){
+        TERR[y][x]=BIOME.rock;
+      }else{
+        TERR[y][x]=BIOME.mountain; // deep rock
+      }
+      // Cave hollows
+      if(y>SURF[x]+3&&fbm(x/5,y/5,3,SEED+881)<0.30) TERR[y][x]=0;
+      // Dungeon pocket in bottom corner (mirrors BM corner)
+      if(x>W-18&&y>TERR_H-22) TERR[y][x]=BIOME.dungeon;
+      // Volcanic underground
+      if(x<12&&y>SURF[x]+8) TERR[y][x]=BIOME.volcanic;
+    }
+  }
+}
+
+// Render the Terraria side-scroll view.
+function renderTerraria(now){
+  const tw=CW/TS, th=CH/TS;
+  const col=Math.max(0,Math.min(W-1,Math.floor(P.wx)));
+  const camTX=P.wx-tw/2;
+  const camTYc=P_ty-th/2;
+
+  // Sky gradient background
+  const surfPx=(SURF[col]-camTYc)*TS;
+  const gradTop=Math.max(0,surfPx);
+  if(gradTop>0){
+    const grad=ctx.createLinearGradient(0,0,0,Math.min(gradTop,CH));
+    grad.addColorStop(0,'#040812');grad.addColorStop(1,'#0d1f40');
+    ctx.fillStyle=grad;ctx.fillRect(0,0,CW,Math.min(gradTop,CH));
+  }
+  // Underground background
+  if(gradTop<CH){
+    ctx.fillStyle='#0a0a0a';ctx.fillRect(0,Math.max(0,gradTop),CW,CH);
+  }
+
+  // Draw visible tiles
+  const x0=Math.max(0,Math.floor(camTX)-1);
+  const x1=Math.min(W-1,Math.ceil(camTX+tw)+1);
+  const y0=Math.max(0,Math.floor(camTYc)-1);
+  const y1=Math.min(TERR_H-1,Math.ceil(camTYc+th)+1);
+  for(let y=y0;y<=y1;y++){
+    for(let x=x0;x<=x1;x++){
+      const t=TERR[y][x];if(!t)continue;
+      const sx=Math.round((x-camTX)*TS);
+      const sy=Math.round((y-camTYc)*TS);
+      const c=BC[t]||BC[3];
+      // Shade by depth
+      const depthShade=Math.max(0,1-(y-SURF[col])/60);
+      ctx.fillStyle=c[0];
+      if(depthShade<0.9){
+        ctx.globalAlpha=depthShade*.5+.5;
+        ctx.fillStyle=c[2]; // use darker face for depth
+      }
+      ctx.fillRect(sx,sy,TS,TS);
+      ctx.globalAlpha=1;
+      // Top-face highlight
+      if(TERR[Math.max(0,y-1)][x]===0){
+        ctx.fillStyle=c[0];ctx.fillRect(sx,sy,TS,3);
+      }
+      // Dungeon torch glow
+      if(t===BIOME.dungeon&&(x*7+y*13)%11===0){
+        ctx.globalAlpha=0.12+0.08*Math.sin(now*.003+x);
+        ctx.fillStyle='#ff9020';ctx.fillRect(sx-2,sy-2,TS+4,TS+4);
+        ctx.globalAlpha=1;
+      }
+    }
+  }
+
+  // NPCs at their surface column
+  for(const n of npcs){
+    if(!n.alive)continue;
+    const nc=Math.max(0,Math.min(W-1,Math.floor(n.wx)));
+    const nsy_world=SURF[nc]-1;
+    const nsx=Math.round((n.wx-camTX)*TS);
+    const nsy=Math.round((nsy_world-camTYc)*TS);
+    if(nsx<-20||nsx>CW+20||nsy<-40||nsy>CH+20)continue;
+    ctx.fillStyle=n.col||'#888';
+    ctx.fillRect(nsx-TS/2+1,nsy-TS*2+2,TS-2,TS*2-2);
+    ctx.font='13px serif';ctx.textAlign='center';
+    ctx.fillText(n.icon||'?',nsx,nsy-4);
+    if(n.questId&&n.questId&&!activeQuests[n.questId]){
+      ctx.fillStyle='#ffd700';ctx.font='bold 13px sans-serif';
+      ctx.fillText('!',nsx,nsy-TS*2-2);
+    }
+  }
+
+  // Player sprite
+  const psx=Math.round((P.wx-camTX)*TS);
+  const psy=Math.round((P_ty-camTYc)*TS);
+  ctx.fillStyle=P.col||'#a0c8ff';
+  ctx.fillRect(psx-TS/2+1,psy-TS*2+2,TS-2,TS*2-2);
+  ctx.font='14px serif';ctx.textAlign='center';
+  ctx.fillText(P.icon||'🧙',psx,psy-4);
+  // Jump indicator
+  if(!isOnGround()){
+    ctx.strokeStyle='rgba(100,200,255,.4)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(psx,psy,TS,0,Math.PI*2);ctx.stroke();ctx.lineWidth=1;
+  }
+
+  // Depth HUD
+  const depth=Math.max(0,P_ty-SURF[col]);
+  ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(CW-145,10,135,22);
+  ctx.fillStyle='#bbb';ctx.font='11px monospace';ctx.textAlign='right';
+  ctx.fillText(`⬇ Depth: ${depth.toFixed(0)}m`,CW-12,26);
+  ctx.textAlign='left';
+
+  // Zone label
+  const tileAtFeet=TERR[Math.max(0,Math.min(TERR_H-1,Math.floor(P_ty)))][col]||BIOME.grass;
+  const zoneName=depth<1?'Surface':depth<8?'Shallow Cave':depth<25?'Caverns':'Deep Dungeon';
+  document.getElementById('zone-label').textContent=`${zoneName} — ${ZONE_NAMES[tileAtFeet]||'Unknown'}`;
+}
+
+// Player movement with gravity for Terraria mode.
+function processMoveTerraria(dt,now){
+  if(inDlg)return;
+  const speed=6.5*dt;
+  const col=Math.max(0,Math.min(W-1,Math.floor(P.wx)));
+  const onGround=isOnGround();
+
+  // Horizontal
+  let dx=0;
+  if(keys['a']||keys['arrowleft'])dx-=1;
+  if(keys['d']||keys['arrowright'])dx+=1;
+  if(dx!==0){
+    const nx=P.wx+dx*speed;
+    const nc=Math.max(0,Math.min(W-1,Math.floor(nx)));
+    const footY=Math.min(TERR_H-1,Math.floor(P_ty));
+    const headY=Math.max(0,Math.floor(P_ty)-1);
+    // Allow step-up of 1 tile (Terraria auto-jump)
+    if(TERR[footY][nc]===0&&TERR[headY][nc]===0){
+      P.wx=Math.max(0.5,Math.min(W-0.5,nx));
+    }else if(TERR[Math.max(0,footY-1)][nc]===0&&TERR[Math.max(0,headY-1)][nc]===0){
+      P.wx=Math.max(0.5,Math.min(W-0.5,nx));
+      P_ty-=1;  // step up
+    }
+    P.facing=dx>0?2:3;
+  }
+
+  // Jump
+  if((keys[' ']||keys['w']||keys['arrowup'])&&onGround) P_vy=-JUMP_FORCE;
+
+  // Gravity + vertical collision
+  P_vy=Math.min(P_vy+GRAVITY*dt, 18); // terminal velocity
+  const ny=P_ty+P_vy*dt;
+  const nc=Math.max(0,Math.min(W-1,Math.floor(P.wx)));
+
+  if(P_vy>=0){
+    // Falling: check floor
+    const footNew=Math.min(TERR_H-1,Math.floor(ny));
+    if(TERR[footNew][nc]!==0){
+      P_ty=footNew;      // land on floor
+      P_vy=0;
+    }else P_ty=ny;
+  }else{
+    // Rising: check ceiling
+    const headNew=Math.max(0,Math.floor(ny)-1);
+    if(TERR[headNew][nc]!==0){
+      P_ty=Math.floor(ny)+1;
+      P_vy=0;
+    }else P_ty=ny;
+  }
+
+  P.moving=dx!==0||!onGround;
+  P.anim=P.moving&&onGround?'walk':'idle';
+  if(now-P.animT>125){P.animF=(P.animF+1)%4;P.animT=now;}
+}
+
+// True when player has a solid tile directly below their feet.
+function isOnGround(){
+  const col=Math.max(0,Math.min(W-1,Math.floor(P.wx)));
+  const footY=Math.min(TERR_H-1,Math.floor(P_ty)+1);
+  return TERR[footY][col]!==0;
+}
+
+// Sync Terraria P_ty to surface when entering outdoor mode.
+function initTerrariaPos(){
+  const col=Math.max(0,Math.min(W-1,Math.floor(P.wx)));
+  P_ty=SURF[col]-0.01; // just at surface
+  P_vy=0;
+}
+
+// ─── INDOOR biomes use ISO; everything else uses Terraria ─────────────────────
+const ISO_BIOMES=new Set([BIOME.village,BIOME.building,BIOME.dungeon]);
+let prevRenderMode='terraria';
+
+function updateRenderMode(){
+  const pbx=Math.max(0,Math.min(W-1,Math.floor(P.wx)));
+  const pby=Math.max(0,Math.min(W-1,Math.floor(P.wy)));
+  const pb=BM[pby][pbx]??BIOME.grass;
+  const newMode=ISO_BIOMES.has(pb)?'iso':'terraria';
+  if(newMode!==prevRenderMode){
+    if(newMode==='terraria')initTerrariaPos();
+    prevRenderMode=newMode;
+  }
+  renderMode=newMode;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // GAME LOOP
 // ═══════════════════════════════════════════════════════════════════
 let lastT=0,mmTimer=0;
 function loop(now){
   if(!P){requestAnimationFrame(loop);return;}
   const dt=Math.min((now-lastT)/1000,.05);lastT=now;
-  processMove(dt,now);processCombat(now);
+
+  updateRenderMode();
+
+  if(renderMode==='terraria'){
+    processMoveTerraria(dt,now);
+  }else{
+    processMove(dt,now);
+  }
+  processCombat(now);
   updateMonsterAI(dt,now);checkPickup();
   updateCamera();
-  render(now);drawDayNight(now);
+
+  if(renderMode==='terraria'){
+    renderTerraria(now);
+  }else{
+    render(now);
+  }
+  drawDayNight(now);
   mmTimer+=dt;if(mmTimer>.4){renderMinimap();mmTimer=0;}
   updateHotbarCDs(now);
   requestAnimationFrame(loop);

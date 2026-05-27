@@ -120,7 +120,9 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 name = "bifrost-aigm"
 version = "0.1.0"
 dependencies = [
+ "bifrost-kernel",
  "blake3",
+ "nova-core",
  "serde",
  "serde_json",
  "thiserror",
@@ -174,6 +176,7 @@ dependencies = [
 name = "bifrost-run"
 version = "0.1.0"
 dependencies = [
+ "bifrost-kernel",
  "serde",
  "serde_json",
  "thiserror",
@@ -195,7 +198,9 @@ name = "bifrost-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "bifrost-aigm",
  "bifrost-chunk",
+ "bifrost-kernel",
  "bifrost-lockstep",
  "bifrost-physics",
  "bifrost-run",
@@ -220,6 +225,7 @@ dependencies = [
 name = "bifrost-synthesis"
 version = "0.1.0"
 dependencies = [
+ "bifrost-kernel",
  "bifrost-run",
  "bifrost-wac",
  "rand",
@@ -246,12 +252,23 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "hex",
+ "nova-anim",
  "rand",
  "reqwest",
  "serde",
  "serde_json",
  "thiserror",
  "uuid",
+]
+
+[[package]]
+name = "bifrost-wasm"
+version = "0.1.0"
+dependencies = [
+ "bifrost-wac",
+ "nexus-voxel-kernel",
+ "serde_json",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -950,6 +967,7 @@ version = "0.1.0"
 dependencies = [
  "bifrost-chunk",
  "bifrost-vis",
+ "bifrost-wac",
  "blake3",
  "hex",
  "serde",

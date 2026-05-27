@@ -1,17 +1,15 @@
 import * as pulumi from "@pulumi/pulumi";
-import * as gcp from "@pulumi/gcp";
+import * as azure from "@pulumi/azure-native";
 import * as dockerbuild from "@pulumi/docker-build";
-import * as random from "@pulumi/random";
 
-// Import the program's configuration settings.
-const config = new pulumi.Config();
-const imageName = config.get("imageName") || "my-app";
-const appPath = config.get("appPath") || "./app";
+// ── Configuration ──────────────────────────────────────────────────────────────
+const config        = new pulumi.Config();
+const appPath       = config.get("appPath")      || ".";
 const containerPort = config.getNumber("containerPort") || 8080;
-const cpu = config.getNumber("cpu") || 1;
-const memory = config.get("memory") || "1Gi";
-const concurrency = config.getNumber("concurrency") || 80;
+const cpu           = config.get("cpu")          || "0.5";
+const memory        = config.get("memory")       || "1Gi";
 
+<<<<<<< HEAD
 // ── LLM Backend Configuration ─────────────────────────────────────────────────
 //
 // bKG uses two LLM backends. Azure AI is preferred when AZURE_AI_KEY is set.
@@ -37,54 +35,107 @@ const azureAiDeployment = config.get("azureAiDeployment") || "gpt-4o-mini";
 const nvidiaApiKey   = config.requireSecret("nvidiaApiKey");
 const nvidiaBaseUrl  = config.get("nvidiaBaseUrl") || "https://integrate.api.nvidia.com/v1";
 const nvidiaModel    = config.get("nvidiaModel")   || "meta/llama-3.3-70b-instruct";
+=======
+// NVIDIA NIM configuration — used by bifrost-wac (nvidia-nim feature).
+const nvidiaApiKey  = config.getSecret("nvidiaApiKey")  ?? pulumi.output("");
+const nvidiaBaseUrl = config.get("nvidiaBaseUrl") || "https://integrate.api.nvidia.com/v1";
+const nvidiaModel   = config.get("nvidiaModel")   || "meta/llama-3.3-70b-instruct";
+>>>>>>> 009a33b (`R3: bifrost-aigm, bifrost-server, and bifrost-wasm integration`)
 
-// Import the provider's configuration settings.
-const gcpConfig = new pulumi.Config("gcp");
-const location = gcpConfig.require("region");
-const project = gcpConfig.require("project");
+const azureConfig   = new pulumi.Config("azure-native");
+const location      = azureConfig.get("location") || "eastus";
 
-// Generate a unique Artifact Registry repository ID
-const uniqueString = new random.RandomString("unique-string", {
-    length: 4,
-    lower: true,
-    upper: false,
-    numeric: true,
-    special: false,
-})
-let repoId = uniqueString.result.apply(result => "repo-" + result);
-
-// Create an Artifact Registry repository
-const repository = new gcp.artifactregistry.Repository("repository", {
-    description: "Repository for container image",
-    format: "DOCKER",
-    location: location,
-    repositoryId: repoId,
+// ── Resource Group ─────────────────────────────────────────────────────────────
+const resourceGroup = new azure.resources.ResourceGroup("mmo-rg", {
+    location,
 });
 
-// Form the repository URL
-let repoUrl = pulumi.concat(location, "-docker.pkg.dev/", project, "/", repository.repositoryId);
+// ── Azure Container Registry ───────────────────────────────────────────────────
+// Equivalent to GCP Artifact Registry — stores the Docker image built from
+// the Dockerfile at the workspace root.
+const registry = new azure.containerregistry.Registry("mmoacr", {
+    resourceGroupName: resourceGroup.name,
+    location:          resourceGroup.location,
+    sku:               { name: "Basic" },
+    adminUserEnabled:  true,
+});
 
-// Create a container image for the service.
-// Before running `pulumi up`, configure Docker for authentication to Artifact Registry
-// as described here: https://cloud.google.com/artifact-registry/docs/docker/authentication
-const image = new dockerbuild.Image("image", {
-    tags: [pulumi.concat(repoUrl, "/", imageName)],
+// Retrieve the ACR admin credentials.
+const registryCreds = azure.containerregistry.listRegistryCredentialsOutput({
+    resourceGroupName: resourceGroup.name,
+    registryName:      registry.name,
+});
+const adminUsername = registryCreds.apply(c => c.username!);
+const adminPassword = registryCreds.apply(c => c.passwords![0].value!);
+
+// ── Container Image ────────────────────────────────────────────────────────────
+// Builds the image from the workspace root Dockerfile and pushes to ACR.
+// The Dockerfile includes both the bifrost-server native build and the
+// wasm-pack WASM bundle (bifrost/wasm → app/pkg/bifrost_wasm/).
+const imageName = pulumi.concat(registry.loginServer, "/mmo-server:latest");
+
+const image = new dockerbuild.Image("mmo-image", {
+    tags: [imageName],
     context: {
         location: appPath,
     },
-    // Cloud Run currently requires x86_64 images
-    // https://cloud.google.com/run/docs/container-contract#languages
+    // Cloud-run compatible: x86_64 only.
     platforms: ["linux/amd64"],
     push: true,
+    registries: [{
+        address:  registry.loginServer,
+        username: adminUsername,
+        password: adminPassword,
+    }],
 });
 
-// Create a Cloud Run service definition.
-const service = new gcp.cloudrun.Service("service", {
-    location,
+// ── Container Apps Environment ─────────────────────────────────────────────────
+// Azure's managed serverless container runtime (equivalent to Cloud Run).
+const environment = new azure.app.ManagedEnvironment("mmo-env", {
+    resourceGroupName: resourceGroup.name,
+    location:          resourceGroup.location,
+});
+
+// ── Container App ──────────────────────────────────────────────────────────────
+// Deploys the bifrost-server + Node.js gateway container.
+const containerApp = new azure.app.ContainerApp("mmo-app", {
+    resourceGroupName:    resourceGroup.name,
+    location:             resourceGroup.location,
+    managedEnvironmentId: environment.id,
+    configuration: {
+        ingress: {
+            external:          true,
+            targetPort:        containerPort,
+            allowInsecure:     false,
+            transport:         "auto",
+        },
+        registries: [{
+            server:            registry.loginServer,
+            username:          adminUsername,
+            passwordSecretRef: "acr-password",
+        }],
+        secrets: [
+            {
+                name:  "acr-password",
+                value: adminPassword,
+            },
+            {
+                name:  "nvidia-api-key",
+                value: nvidiaApiKey,
+            },
+        ],
+    },
     template: {
-        spec: {
-            containers: [
+        containers: [{
+            name:  "mmo-server",
+            image: image.ref,
+            resources: {
+                cpu:    parseFloat(cpu),
+                memory,
+            },
+            env: [
                 {
+<<<<<<< HEAD
                     image: image.ref,
                     resources: {
                         limits: {
@@ -129,19 +180,35 @@ const service = new gcp.cloudrun.Service("service", {
                         },
                     ],
                 }
+=======
+                    name:  "PORT",
+                    value: containerPort.toString(),
+                },
+                // NVIDIA NIM for bifrost-wac LLM generation (optional).
+                {
+                    name:        "NVIDIA_API_KEY",
+                    secretRef:   "nvidia-api-key",
+                },
+                {
+                    name:  "NVIDIA_NIM_BASE_URL",
+                    value: nvidiaBaseUrl,
+                },
+                {
+                    name:  "NVIDIA_NIM_MODEL",
+                    value: nvidiaModel,
+                },
+>>>>>>> 009a33b (`R3: bifrost-aigm, bifrost-server, and bifrost-wasm integration`)
             ],
-            containerConcurrency: concurrency,
+        }],
+        scale: {
+            minReplicas: 0,
+            maxReplicas: 10,
         },
     },
 });
 
-// Create an IAM member to allow the service to be publicly accessible.
-const invoker = new gcp.cloudrun.IamMember("invoker", {
-    location,
-    service: service.name,
-    role: "roles/run.invoker",
-    member: "allUsers",
-});
-
-// Export the URL of the service.
-export const url = service.statuses.apply(statuses => statuses[0]?.url);
+// Export the public URL of the Container App.
+export const url = containerApp.configuration.apply(
+    c => c?.ingress?.fqdn ? `https://${c.ingress.fqdn}` : "pending"
+);
+export const registryLoginServer = registry.loginServer;

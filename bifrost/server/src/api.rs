@@ -758,31 +758,121 @@ pub async fn tick_run(
 }
 
 /// `POST /run/end` — force-end the active run.
+///
+/// ## Step 7 — Wire run→PressureGraph→WorldDirector (FIX.md)
+///
+/// After ending the run:
+/// 1. Builds a [`PressureGraph`] from the run result (dominant strategy → signals)
+/// 2. Feeds it to [`WorldDirector::tick`] → emits [`AssetBlueprint`]s
+/// 3. Compiles each blueprint through WAC
+/// 4. Applies compiled biome/loot/entity assets to the nexus voxel kernel
+///
+/// This closes the loop: `Run end → WAC compile → new world`.
 pub async fn end_run(
     State(shared): State<SharedState>,
     Json(req): Json<EndRunReq>,
 ) -> impl IntoResponse {
+    use bifrost_run::end_condition::EndCondition;
+    use bifrost_wac::pressure::{GlobalPressure, PressureGraph, ZonePressure};
+
     let mut s = shared.lock().await;
     let tick = s.world.tick();
-    match s.run_director.active_run_mut() {
-        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "no active run" }))).into_response(),
+
+    // ── 1. End the run ────────────────────────────────────────────────────────
+    let run_result = match s.run_director.active_run_mut() {
+        None => return (StatusCode::NOT_FOUND, Json(json!({ "error": "no active run" }))).into_response(),
         Some(run) => {
-            let result = RunResult::draw(
-                run.end_condition.clone(),
-                run.player_factions.iter().chain(run.ai_factions.iter()).cloned().collect(),
-            );
-            run.state    = RunState::Ended(result);
+            let result = if let Some(ref winner) = req.winner_faction_id {
+                let losers: Vec<_> = run.player_factions.iter().chain(run.ai_factions.iter())
+                    .filter(|f| f.as_str() != winner)
+                    .cloned()
+                    .collect();
+                RunResult::winner(winner.clone(), losers, run.end_condition.clone())
+            } else {
+                RunResult::draw(
+                    run.end_condition.clone(),
+                    run.player_factions.iter().chain(run.ai_factions.iter()).cloned().collect(),
+                )
+            };
+            run.state    = RunState::Ended(result.clone());
             run.end_tick = Some(tick);
-            let id = run.id;
-            Json(json!({
-                "ok":     true,
-                "run_id": id,
-                "winner": req.winner_faction_id,
-                "reason": req.reason,
-                "ended_at_tick": tick,
-            })).into_response()
+            result
+        }
+    };
+
+    // ── 2. Build PressureGraph from run result (Step 7) ───────────────────────
+    // Map the run's dominant strategy onto world pressure signals so the
+    // WorldDirector counter-adapts the next epoch.
+    let mut pressure = PressureGraph::new(tick);
+
+    match &run_result.condition_triggered {
+        EndCondition::EconomicDominance { .. } => {
+            // Economy exploit → generate scarcity biomes + volatile loot
+            pressure.global = GlobalPressure {
+                economy_delta:      0.45,   // strong inflation signal
+                narrative_momentum: 0.05,   // narrative needs a spark
+                total_players:      1,
+                player_trend:       0.0,
+                quest_throughput:   0.0,
+            };
+        }
+        EndCondition::FirstToControlZones { .. } => {
+            // Zone rush → increase contention in all zones
+            for zone_id in s.zones.keys().cloned().collect::<Vec<_>>() {
+                pressure.insert_zone(ZonePressure {
+                    zone_id:        zone_id.clone(),
+                    player_density: 5.0,
+                    kill_rate:      4.0,    // generates biome evolution
+                    contention:     0.9,
+                    loot_flow:      20.0,
+                    quest_rate:     0.3,
+                });
+            }
+        }
+        EndCondition::SurvivalUntilTick(_) | EndCondition::FirstToReachTechLevel { .. } => {
+            // Balanced — narrative was the winning factor
+            pressure.global = GlobalPressure {
+                economy_delta:      0.0,
+                narrative_momentum: 0.02,   // stalled — fire a story beat
+                total_players:      1,
+                player_trend:       0.0,
+                quest_throughput:   0.0,
+            };
         }
     }
+
+    // ── 3. WorldDirector tick → AssetBlueprints ───────────────────────────────
+    let decisions = s.director.tick(&pressure);
+
+    // ── 4. Compile blueprints through WAC + apply to nexus_rt ────────────────
+    let mut compiled_count = 0usize;
+    for decision in &decisions {
+        if let Ok(ir) = bifrost_wac::compile(&decision.blueprint) {
+            // Validate succeeded; apply to the nexus voxel kernel.
+            // Biome definitions update the chunk generator for new chunks.
+            use bifrost_wac::types::CompiledAsset;
+            if let CompiledAsset::BiomeDefinition(biome_ir) = ir.asset {
+                // Apply the new biome to the nexus runtime (no specific position —
+                // this registers the biome for future chunk generation).
+                s.nexus_rt.apply_biome_ir(
+                    biome_ir,
+                    nexus_voxel_kernel::core::ChunkPos::default(),
+                );
+                compiled_count += 1;
+            }
+        }
+    }
+
+    let run_id = s.run_director.runs.last().map(|r| r.id);
+    Json(json!({
+        "ok":             true,
+        "run_id":         run_id,
+        "winner":         run_result.winner,
+        "reason":         req.reason,
+        "ended_at_tick":  tick,
+        "director_decisions": decisions.len(),
+        "compiled_blueprints": compiled_count,
+    })).into_response()
 }
 
 /// `GET /run/history` — all runs (active and completed).
@@ -962,5 +1052,227 @@ pub async fn zone_influence(
                 "influence": zone.influence,
             })).into_response()
         }
+    }
+}
+
+// ─── AI Game Master routes ────────────────────────────────────────────────────
+
+use bifrost_aigm::event::{
+    AuthorId, EventPayload, EventType, QuestCreatePayload,
+    QuestObjectivePayload, QuestRewardPayload, ReputationChangePayload,
+};
+use bifrost_kernel::SequencedInstant;
+use bifrost_aigm::event::WorldEvent as AigmWorldEvent;
+
+/// `GET /aigm/npcs` — return all NPCs in the start area (safe-city zone).
+///
+/// game.html replaces its hardcoded NPC array with the response from this
+/// endpoint on startup.  Each entry includes id, name, position, and
+/// dialogue lines needed for the renderer.
+pub async fn aigm_npcs(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let npcs: Vec<serde_json::Value> = s.npc_registry.iter()
+        .map(|(id, state)| {
+            // system_prompt is stored as "DisplayName|goal"
+            let name = state.ai_context.system_prompt
+                .split_once('|')
+                .map(|(n, _)| n)
+                .unwrap_or(id);
+            json!({
+                "id":      id,
+                "name":    name,
+                "zone_id": state.zone_id,
+                "wx":      state.position[0],  // 2D world-x coord for game.html
+                "wy":      state.position[2],  // 2D world-y coord (z in 3D)
+                "hp":      state.hp_current,
+                "hp_max":  state.hp_max,
+                "alive":   state.is_alive(),
+            })
+        })
+        .collect();
+    Json(json!({ "npcs": npcs, "count": npcs.len() }))
+}
+
+/// Static quest-chain definitions served to the client.
+///
+/// This mirrors the QCHAINS object formerly hardcoded in game.html.
+/// The server is authoritative; the client falls back to its bundled copy
+/// if this endpoint is unreachable.
+fn quest_chains_json() -> serde_json::Value {
+    json!({
+      "chain_guard": {
+        "stages": [
+          { "id":"g1","title":"Wolf Menace","icon":"🐺","target":"wolf","count":5,"gold":40,"xp":80,
+            "who":"Guard Captain Aldric","desc":"Kill 5 wolves in the northern fields.",
+            "dlg":"The wolves have killed 3 farmers this week. Clear them out!",
+            "reward_dlg":"Excellent work! The farms are safe again.","next":"g2" },
+          { "id":"g2","title":"Goblin Raiders","icon":"👺","target":"goblin","count":8,"gold":70,"xp":140,
+            "who":"Guard Captain Aldric","desc":"Defeat 8 goblins raiding from the eastern mountains.",
+            "dlg":"Now the goblins grow bold. Strike their war band!",
+            "reward_dlg":"Masterful! But their chief still roams the peaks.","next":"g3" },
+          { "id":"g3","title":"The Goblin Chief","icon":"👑","target":"goblin_chief","count":1,"gold":120,"xp":250,
+            "who":"Guard Captain Aldric","desc":"Defeat the Goblin Chief in the eastern mountains.",
+            "dlg":"Their chief leads them. Defeat him and they scatter!",
+            "reward_dlg":"The mountains are free! You are a true hero.","next":null }
+        ]
+      },
+      "chain_inn": {
+        "stages": [
+          { "id":"i1","title":"Rat Infestation","icon":"🐀","target":"rat","count":5,"gold":30,"xp":60,
+            "who":"Innkeeper Bram","desc":"Clear the giant rats from the inn cellar.",
+            "dlg":"Rats everywhere! I can't open the cellar. Please help!",
+            "reward_dlg":"You've saved my business! But there was something else...","next":"i2" },
+          { "id":"i2","title":"Spider Nest","icon":"🕷","target":"spider","count":6,"gold":55,"xp":110,
+            "who":"Innkeeper Bram","desc":"Eliminate the spider nest in the dark forest.",
+            "dlg":"Giant spiders followed the rats. I found webs in the forest!",
+            "reward_dlg":"Thank the gods. Here, take this gold.","next":"i3" },
+          { "id":"i3","title":"Forest Troll","icon":"👹","target":"troll","count":2,"gold":100,"xp":200,
+            "who":"Innkeeper Bram","desc":"Drive away the forest trolls terrorizing travelers.",
+            "dlg":"Trolls have blocked the forest road. Please clear them!",
+            "reward_dlg":"The road is open again! You've been the salvation of this inn.","next":null }
+        ]
+      },
+      "chain_elder": {
+        "stages": [
+          { "id":"e1","title":"Ancient Text","icon":"📖","target":"skeleton","count":4,"gold":60,"xp":120,
+            "who":"Elder Mirova","desc":"The skeletons in the dungeon carry old relics. Recover 4.",
+            "dlg":"Skeletons guard an ancient text we need. Please retrieve it.",
+            "reward_dlg":"This text speaks of a powerful ritual. We must stop it.","next":"e2" },
+          { "id":"e2","title":"Dark Crystals","icon":"💎","target":"troll","count":3,"gold":80,"xp":160,
+            "who":"Elder Mirova","desc":"Trolls have stolen the ritual crystals. Recover them.",
+            "dlg":"The ritual requires dark crystals. The trolls took them!",
+            "reward_dlg":"We have what we need. But the ritual has begun...","next":"e3" },
+          { "id":"e3","title":"Stop the Ritual","icon":"⚡","target":"lich","count":1,"gold":150,"xp":350,
+            "who":"Elder Mirova","desc":"The Dungeon Lich leads the ritual. Destroy him!",
+            "dlg":"The Lich performs the ritual deep in the dungeon. GO NOW!",
+            "reward_dlg":"You've saved us all. The darkness is defeated!","next":null }
+        ]
+      },
+      "chain_wiz": {
+        "stages": [
+          { "id":"w1","title":"Fire Elementals","icon":"🔥","target":"elemental","count":4,"gold":65,"xp":130,
+            "who":"Wizard Seraphon","desc":"Fire elementals threaten the dungeon entrance. Banish 4.",
+            "dlg":"The elementals block my research. Eliminate them!",
+            "reward_dlg":"Excellent. The dungeon is accessible again.","next":"w2" },
+          { "id":"w2","title":"Shard of Power","icon":"✨","target":"dungeon","count":3,"gold":90,"xp":180,
+            "who":"Wizard Seraphon","desc":"Collect 3 dungeon shards for the arcane ritual.",
+            "dlg":"The Lich holds 3 shards of ancient power. Retrieve them!",
+            "reward_dlg":"Excellent. These shards reveal dungeon secrets.","next":"w3" },
+          { "id":"w3","title":"Skeletal Guardians","icon":"💀","target":"skeleton","count":5,"gold":110,"xp":220,
+            "who":"Wizard Seraphon","desc":"Skeletal guardians protect the dungeon archives.",
+            "dlg":"Clear the archive guardians so I can retrieve the tome!",
+            "reward_dlg":"The tome is ours. The secret of the Lich is revealed!","next":null }
+        ]
+      }
+    })
+}
+
+/// `GET /aigm/quests` — return quest chain definitions + active registry state.
+///
+/// The client uses this to populate `QCHAINS` at startup.
+/// Falls back to bundled data if this endpoint is unreachable.
+pub async fn aigm_quests_list(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let active: Vec<serde_json::Value> = s.quest_registry.active_quests()
+        .map(|q| json!({
+            "quest_id": q.quest_id,
+            "title":    q.title,
+            "state":    format!("{:?}", q.state),
+        }))
+        .collect();
+    Json(json!({
+        "chains": quest_chains_json(),
+        "active": active,
+        "count":  active.len(),
+    }))
+}
+
+/// Request body for `POST /aigm/quests/:chain_id/accept`.
+#[derive(serde::Deserialize)]
+pub struct QuestAcceptReq {
+    pub player_id: String,
+    pub zone_id:   Option<String>,
+}
+
+/// `POST /aigm/quests/:chain_id/accept` — player accepts a quest chain.
+///
+/// Creates an `AigmQuestCreate` [`WorldEvent`], processes it through the zone
+/// [`EventPipeline`] (R3), appends it to the [`Ledger`] (R4), and projects it
+/// into the [`QuestRegistry`].
+pub async fn aigm_quest_accept(
+    State(shared): State<SharedState>,
+    Path(chain_id): Path<String>,
+    Json(req): Json<QuestAcceptReq>,
+) -> impl IntoResponse {
+    let zone_id = req.zone_id.unwrap_or_else(|| "safe-city".into());
+
+    // Build the first stage of the chain as the quest to create.
+    let chains = quest_chains_json();
+    let stages = match chains.get(&chain_id).and_then(|c| c.get("stages")).and_then(|s| s.as_array()) {
+        Some(s) => s.clone(),
+        None => return (StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("unknown quest chain: {chain_id}") }))).into_response(),
+    };
+    let first = match stages.first() {
+        Some(s) => s.clone(),
+        None    => return bad!("quest chain has no stages"),
+    };
+
+    let quest_id = format!("{chain_id}_{}", req.player_id);
+    let title    = first.get("title").and_then(|v| v.as_str()).unwrap_or("Quest").to_string();
+    let desc     = first.get("desc").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let giver    = first.get("who").and_then(|v| v.as_str()).unwrap_or("npc").to_string();
+    let target   = first.get("target").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let count    = first.get("count").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+    let gold     = first.get("gold").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let xp       = first.get("xp").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let stage_id = first.get("id").and_then(|v| v.as_str()).unwrap_or("s1").to_string();
+
+    let payload = QuestCreatePayload {
+        quest_id:    quest_id.clone(),
+        title,
+        description: desc,
+        giver_npc_id: giver,
+        target_ids:  vec![req.player_id.clone()],
+        objectives: vec![QuestObjectivePayload {
+            objective_id:   stage_id,
+            kind:           "kill".into(),
+            description:    format!("Defeat {count} {target}"),
+            target_id:      Some(target),
+            required_count: count,
+        }],
+        reward: QuestRewardPayload {
+            xp,
+            gold,
+            items: vec![],
+            reputation: vec![ReputationChangePayload {
+                faction_id: "village".into(),
+                delta: 5,
+                reason: "quest_complete".into(),
+            }],
+        },
+        expires_at: None,
+        ai_context: format!("player {player_id} accepted {chain_id}", player_id = req.player_id),
+    };
+
+    let event = AigmWorldEvent::new(
+        SequencedInstant::ZERO,   // pipeline will overwrite this
+        EventType::AigmQuestCreate,
+        EventPayload::AigmQuestCreate(payload),
+        AuthorId::AiGm,
+        &[0u8; 32],
+        &zone_id,
+        0,
+    );
+
+    let mut s = shared.lock().await;
+    match s.emit(event) {
+        Ok(_) => Json(json!({
+            "ok":       true,
+            "quest_id": quest_id,
+            "zone_id":  zone_id,
+        })).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e }))).into_response(),
     }
 }

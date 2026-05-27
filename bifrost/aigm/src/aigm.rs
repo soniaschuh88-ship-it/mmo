@@ -29,6 +29,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use bifrost_kernel::SequencedInstant;
+
 use crate::event::{
     AuthorId, EventPayload, EventType, WorldEvent,
 };
@@ -260,8 +262,8 @@ impl AiGmState {
             self.story_engine.apply_event(event);
 
             // Advance chain head.
-            if event.seq >= self.head_seq {
-                self.head_seq = event.seq;
+            if event.instant.seq >= self.head_seq {
+                self.head_seq = event.instant.seq;
                 self.head_hash = event.world_hash;
             }
         }
@@ -323,8 +325,9 @@ impl AiGmState {
                 break;
             }
             let seq = self.next_seq();
+            let instant = SequencedInstant::new(current_tick, seq);
             let event = WorldEvent::new(
-                seq,
+                instant,
                 EventType::AigmStoryBeat,
                 EventPayload::AigmStoryBeat(payload),
                 AuthorId::AiGm,
@@ -375,7 +378,7 @@ mod tests {
         let mut gm = AiGmState::new("w", "m");
         let genesis = [0u8; 32];
         let event = WorldEvent::new(
-            1,
+            SequencedInstant::new(0, 1),
             EventType::ZoneLoad,
             EventPayload::ZoneLoad(crate::event::ZonePayload { zone_id: "zone-a".into() }),
             AuthorId::System,

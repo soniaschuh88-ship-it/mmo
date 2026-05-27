@@ -91,10 +91,10 @@ impl StoryEngine {
             EventType::AigmStoryBeat => {
                 if let EventPayload::AigmStoryBeat(p) = &event.payload {
                     self.fired_beats.insert(p.beat_id.clone());
-                    self.last_beat_tick = Some(event.seq); // seq used as proxy for tick
+                    self.last_beat_tick = Some(event.instant.tick);
                     // Mark the beat in the arc data structure.
                     if let Some(arc) = self.arcs.iter_mut().find(|a| a.arc_id == p.arc_id) {
-                        arc.mark_beat_fired(&p.beat_id, event.seq);
+                        arc.mark_beat_fired(&p.beat_id, event.instant.tick);
                     }
                 }
             }

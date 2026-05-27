@@ -4,6 +4,7 @@
 //! using only the blueprint's `natural_language_spec`, `constraints`, and
 //! `seed`.  Identical inputs always produce identical outputs.
 
+pub mod anim_bridge;   // Step 4: AnimIR → nova-anim FSM conversion
 pub mod animation;
 pub mod biome;
 pub mod entity;

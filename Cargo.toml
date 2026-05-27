@@ -9,6 +9,7 @@ members = [
     "bifrost/physics",
     "bifrost/server",
     "bifrost/aigm",
+    "bifrost/wasm",
     "bifrost/wac",
     "bifrost/run",
     "bifrost/synthesis",
@@ -53,7 +54,8 @@ tracing     = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # WASM compatibility
-getrandom   = { version = "0.2", features = ["js"] }
+getrandom     = { version = "0.2", features = ["js"] }
+wasm-bindgen  = "0.2"
 
 # Internal crates
 bifrost-vis      = { path = "bifrost/vis" }
@@ -64,6 +66,8 @@ bifrost-witness  = { path = "bifrost/witness" }
 bifrost-physics  = { path = "bifrost/physics" }
 bifrost-server   = { path = "bifrost/server" }
 bifrost-wac      = { path = "bifrost/wac" }
+bifrost-aigm     = { path = "bifrost/aigm" }
+bifrost-wasm     = { path = "bifrost/wasm" }
 bifrost-run       = { path = "bifrost/run" }
 bifrost-synthesis  = { path = "bifrost/synthesis" }
 bifrost-safe-city  = { path = "bifrost/safe-city" }

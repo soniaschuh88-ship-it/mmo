@@ -182,20 +182,10 @@ impl WacResult {
 
 // ── Biome IR ──────────────────────────────────────────────────────────────────
 
-/// Intermediate representation of a WAC biome spec, after name resolution.
-///
-/// All material names have been resolved to palette IDs.
-pub struct BiomeIR {
-    pub name:        String,
-    pub seed:        u64,
-    pub temperature: f32,
-    pub humidity:    f32,
-    pub density:     f32,
-    pub frequency:   f64,
-    pub terrain:     TerrainStyle,
-    pub emission:    EmissionMode,
-    pub materials:   Vec<u16>,  // resolved material IDs
-}
+// R1 — One concept, one crate.
+// BiomeIR is defined once in bifrost-wac (the "World Type Authority").
+// nexus-voxel-kernel imports it from there rather than redefining it.
+pub use bifrost_wac::types::BiomeIR;
 
 // ── RuntimeAdapter ────────────────────────────────────────────────────────────
 
@@ -293,10 +283,12 @@ impl RuntimeAdapter {
         }
     }
 
-    /// Convenience: apply a `BiomeIR` directly (e.g. from an LLM struct output).
+    /// Convenience: apply a `BiomeIR` directly (e.g. from the WAC pipeline or LLM output).
+    ///
+    /// `BiomeIR` now comes from `bifrost-wac` (R1 — single definition).
     pub fn apply_biome_ir(&mut self, ir: BiomeIR, pos: ChunkPos) -> VoxelChunk {
         let rules = build_rules_from_ir(&ir, &self.world.palette);
-        let biome = Biome::new(ir.name, ir.temperature, ir.humidity, rules);
+        let biome = Biome::new(ir.id.clone(), ir.temperature, ir.humidity, rules);
         self.world.biomes.register(biome.clone());
         let chunk = generate_chunk(pos, &biome);
         self.world.insert_chunk(chunk.clone());
@@ -413,23 +405,70 @@ fn build_layers_from_materials(mats: &[u16], _palette: &MaterialPalette) -> Vec<
     }
 }
 
+/// Derive nexus-kernel voxel rules from the canonical bifrost-wac `BiomeIR`.
+///
+/// Maps the richer WAC spec onto the kernel's internal `VoxelRuleSet`:
+/// - Material strings → resolved palette IDs
+/// - Biome `id` → `TerrainStyle` heuristic
+/// - `elevation` → noise frequency (higher elevation = broader terrain features)
+/// - `tree_density` → fill density
+/// - `light_emission` → `EmissionMode`
 fn build_rules_from_ir(ir: &BiomeIR, palette: &MaterialPalette) -> VoxelRuleSet {
-    let surface    = *ir.materials.first().unwrap_or(&materials::GRASS);
-    let subsurface = *ir.materials.get(1).unwrap_or(&materials::DIRT);
-    let bedrock    = *ir.materials.get(2).unwrap_or(&materials::STONE);
-    let layers     = build_layers_from_materials(&ir.materials, palette);
+    // Resolve string material names to palette IDs.
+    let mats: Vec<u16> = [
+        ir.dominant_material.as_str(),
+        ir.secondary_material.as_str(),
+        ir.accent_material.as_str(),
+    ]
+    .iter()
+    .map(|name| palette.resolve_name(name))
+    .collect();
+
+    let surface    = *mats.first().unwrap_or(&materials::GRASS);
+    let subsurface = *mats.get(1).unwrap_or(&materials::DIRT);
+    let bedrock    = *mats.get(2).unwrap_or(&materials::STONE);
+    let layers     = build_layers_from_materials(&mats, palette);
 
     VoxelRuleSet {
-        terrain_style:  ir.terrain,
-        density:        ir.density,
+        terrain_style:  terrain_style_from_biome_id(&ir.id),
+        density:        ir.tree_density,
         surface,
         subsurface,
         bedrock,
-        frequency:      ir.frequency,
+        // Higher elevation → broader, lower-frequency terrain features.
+        frequency:      (0.02 + (1.0 - ir.elevation as f64) * 0.04).clamp(0.005, 0.12),
         octaves:        5,
-        emission:       ir.emission.clone(),
+        emission:       emission_from_wac(&ir.light_emission),
         layers,
-        feature_density: ir.density * 0.3,
+        feature_density: ir.tree_density * 0.3,
+    }
+}
+
+/// Heuristic: map a canonical biome ID to the matching `TerrainStyle`.
+fn terrain_style_from_biome_id(id: &str) -> TerrainStyle {
+    match id {
+        "dungeon"                           => TerrainStyle::Cave,
+        "volcanic"                          => TerrainStyle::Volcanic,
+        "deep_water" | "water"              => TerrainStyle::Underwater,
+        "mountain" | "rock"                 => TerrainStyle::Cliff,
+        "crimson_forest" | "dark_forest"    => TerrainStyle::Dense,
+        _                                   => TerrainStyle::Hills,
+    }
+}
+
+/// Convert a WAC `LightEmission` option into a kernel `EmissionMode`.
+fn emission_from_wac(le: &Option<bifrost_wac::types::LightEmission>) -> EmissionMode {
+    use bifrost_wac::types::EmissionPattern;
+    match le {
+        None => EmissionMode::None,
+        Some(l) => match l.pattern {
+            EmissionPattern::NocturnalGlow =>
+                EmissionMode::NightGlow { intensity: (l.intensity * 15.0) as u8 },
+            EmissionPattern::SineFlicker | EmissionPattern::Constant =>
+                EmissionMode::CrystalPulse { intensity: (l.intensity * 15.0) as u8 },
+            EmissionPattern::PulseOnPlayer =>
+                EmissionMode::Bio,
+        },
     }
 }
 
@@ -566,21 +605,23 @@ mod tests {
 
     #[test]
     fn wac_biome_ir_direct() {
+        use bifrost_wac::types::LootGraphRef;
         let mut rt = adapter();
+        // BiomeIR now comes from bifrost-wac (R1 — single definition).
         let ir = BiomeIR {
-            name:        "test_biome".into(),
-            seed:        42,
-            temperature: 0.7,
-            humidity:    0.4,
-            density:     0.6,
-            frequency:   0.05,
-            terrain:     TerrainStyle::Hills,
-            emission:    EmissionMode::None,
-            materials:   vec![
-                crate::core::materials::GRASS,
-                crate::core::materials::DIRT,
-                crate::core::materials::STONE,
-            ],
+            id:                 "test_biome".into(),
+            display_name:       "Test Biome".into(),
+            temperature:        0.7,
+            humidity:           0.4,
+            elevation:          0.3,
+            tree_density:       0.6,
+            dominant_material:  "grass".into(),
+            secondary_material: "dirt".into(),
+            accent_material:    "stone".into(),
+            light_emission:     None,
+            ambient_color:      "#1e4820".into(),
+            entity_spawns:      vec![],
+            loot_distribution:  LootGraphRef { loot_table_id: "lt_test_biome".into() },
         };
         let chunk = rt.apply_biome_ir(ir, ChunkPos::default());
         assert!(chunk.fill_count() > 0);

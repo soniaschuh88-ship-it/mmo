@@ -21,6 +21,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use bifrost_kernel::{RawEvent, SequencedInstant};
+
 // ─── Author identity ────────────────────────────────────────────────────────
 
 /// Who produced this event.
@@ -182,12 +184,9 @@ pub struct VoxelExplosionPayload {
     pub damage: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Vec3Payload {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
+// R1 — One concept, one crate: Vec3 is defined once in nova-core.
+// Using f32 throughout (WebGPU / lockstep compatibility).
+pub type Vec3Payload = nova_core::Vec3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EntitySpawnPayload {
@@ -436,10 +435,18 @@ pub struct ZoneAuthorityPayload {
 /// The universal NOVA event ledger entry.
 ///
 /// Append-only. Never mutated after creation.
+///
+/// ## R5 — No SystemTime
+///
+/// `ts_ms` is a wall-clock audit field only — it is **never** included in
+/// `event_hash()` or any hash input.  `instant` is the authoritative ordering
+/// reference; it is assigned by the zone [`EventPipeline`] via [`RawEvent`].
+///
+/// [`EventPipeline`]: bifrost_kernel::EventPipeline
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorldEvent {
-    /// Global monotonic sequence number — unique per (world, zone) pair.
-    pub seq: u64,
+    /// Pipeline-assigned logical position (R5: replaces raw seq/timestamp).
+    pub instant: SequencedInstant,
     /// Discriminant — used for routing and budget accounting.
     pub event_type: EventType,
     /// Typed payload.
@@ -451,8 +458,8 @@ pub struct WorldEvent {
     pub world_hash: [u8; 32],
     /// Zone this event belongs to.
     pub zone_id: String,
-    /// Wall-clock timestamp (unix milliseconds) — informational only.
-    /// The `seq` is the authoritative time reference for simulation.
+    /// Wall-clock timestamp (unix ms) — **informational / audit only**.
+    /// Never included in hash computations (R5).
     pub ts_ms: u64,
 }
 
@@ -460,17 +467,19 @@ impl WorldEvent {
     /// Compute this event's own hash:
     ///
     /// ```text
-    /// BLAKE3(seq_le8 || type_tag || author_str || zone_id || ts_le8 || payload_json)
+    /// BLAKE3(tick_le8 || seq_le8 || type_tag || author_str || zone_id || payload_json)
     /// ```
+    ///
+    /// `ts_ms` is intentionally excluded — it is wall-clock time and would
+    /// make the chain non-deterministic (R5 violation).
     pub fn event_hash(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        h.update(&self.seq.to_le_bytes());
+        h.update(&self.instant.tick.to_le_bytes());
+        h.update(&self.instant.seq.to_le_bytes());
         h.update(self.event_type_tag().as_bytes());
         h.update(self.author.to_string().as_bytes());
         h.update(self.zone_id.as_bytes());
-        h.update(&self.ts_ms.to_le_bytes());
-        // Payload as canonical JSON — serde_json output is deterministic for
-        // the same value, which is sufficient for integrity checking.
+        // Payload as canonical JSON — deterministic for the same value.
         let payload_bytes = serde_json::to_vec(&self.payload)
             .unwrap_or_default();
         h.update(&payload_bytes);
@@ -490,8 +499,14 @@ impl WorldEvent {
     }
 
     /// Build a new event and advance the chain in one call.
+    ///
+    /// `instant` is the `SequencedInstant` assigned by the caller's
+    /// [`EventPipeline`]; `ts_ms` is a wall-clock audit field only and is
+    /// **not** included in the hash (R5).
+    ///
+    /// [`EventPipeline`]: bifrost_kernel::EventPipeline
     pub fn new(
-        seq: u64,
+        instant: SequencedInstant,
         event_type: EventType,
         payload: EventPayload,
         author: AuthorId,
@@ -500,21 +515,21 @@ impl WorldEvent {
         ts_ms: u64,
     ) -> Self {
         let zone_id = zone_id.into();
-        // Compute event hash from fields (world_hash not yet set).
+        // Compute event hash — ts_ms intentionally excluded (R5).
         let mut h = blake3::Hasher::new();
-        h.update(&seq.to_le_bytes());
+        h.update(&instant.tick.to_le_bytes());
+        h.update(&instant.seq.to_le_bytes());
         let type_tag = Self::type_tag_for(event_type);
         h.update(type_tag.as_bytes());
         h.update(author.to_string().as_bytes());
         h.update(zone_id.as_bytes());
-        h.update(&ts_ms.to_le_bytes());
         let payload_bytes = serde_json::to_vec(&payload).unwrap_or_default();
         h.update(&payload_bytes);
         let event_hash = *h.finalize().as_bytes();
 
         let world_hash = Self::compute_world_hash(prev_world_hash, &event_hash);
 
-        WorldEvent { seq, event_type, payload, author, world_hash, zone_id, ts_ms }
+        WorldEvent { instant, event_type, payload, author, world_hash, zone_id, ts_ms }
     }
 
     /// Verify this event's `world_hash` against a known previous hash.
@@ -537,6 +552,21 @@ impl WorldEvent {
     }
 }
 
+// ─── RawEvent (bifrost-kernel R3 integration) ────────────────────────────────
+
+/// R3 — EventPipeline required.
+///
+/// Implementing [`RawEvent`] lets [`EventPipeline`] stamp `WorldEvent` with
+/// a monotonic [`SequencedInstant`] and advance the BLAKE3 chain.
+///
+/// [`EventPipeline`]: bifrost_kernel::EventPipeline
+impl RawEvent for WorldEvent {
+    fn zone_id(&self) -> &str { &self.zone_id }
+    fn content_hash(&self) -> [u8; 32] { self.event_hash() }
+    fn set_instant(&mut self, instant: SequencedInstant) { self.instant = instant; }
+    fn set_world_hash(&mut self, hash: [u8; 32]) { self.world_hash = hash; }
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -549,7 +579,7 @@ mod tests {
 
     fn make_voxel_event(seq: u64, prev: &[u8; 32]) -> WorldEvent {
         WorldEvent::new(
-            seq,
+            SequencedInstant::new(0, seq),
             EventType::VoxelSet,
             EventPayload::VoxelSet(VoxelSetPayload { x: 1, y: 2, z: 3, material: 5, prev: 0 }),
             AuthorId::Player("player-1".into()),

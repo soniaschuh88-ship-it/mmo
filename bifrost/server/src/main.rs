@@ -96,6 +96,10 @@ async fn main() {
         .route("/synthesis/faction",   get(api::synthesis_faction))
         .route("/synthesis/tick",      post(api::synthesis_tick))
         .route("/synthesis/agents",    get(api::synthesis_agents))
+        // AI Game Master — quests + NPCs (Steps 5+6 / R3)
+        .route("/aigm/quests",                        get(api::aigm_quests_list))
+        .route("/aigm/quests/:chain_id/accept",       post(api::aigm_quest_accept))
+        .route("/aigm/npcs",                          get(api::aigm_npcs))
         // Safe City — economy, auction house, zone control
         .route("/safe-city",                          get(api::safe_city_info))
         .route("/safe-city/auction",                  get(api::auction_listings))
