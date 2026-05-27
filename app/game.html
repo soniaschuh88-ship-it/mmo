@@ -189,26 +189,38 @@ body{background:#05050e;color:#e0d8c8;font-family:'Segoe UI',monospace;overflow:
 const W=64,IW=52,IH=26,IZ=14;   // World size, iso dimensions
 
 // ── Biome palette ─────────────────────────────────────────────────
-const BIOME={GD:0,WA:1,SA:2,GR:3,FO:4,CF:5,RK:6,MN:7,SN:8,DG:9,VI:10,BL:11,SW:12,VO:13};
+// Canonical biome IDs — order + names match bifrost-wac/src/biomes.rs BIOME_IDS.
+// DO NOT reorder: index = tile-palette index used by both Rust and JS.
+const BIOME={
+  deep_water:0,water:1,sand:2,grass:3,dark_forest:4,
+  crimson_forest:5,rock:6,mountain:7,snow:8,
+  dungeon:9,village:10,building:11,swamp:12,volcanic:13,
+  // Legacy two-letter aliases — kept so existing references stay valid.
+  GD:0,WA:1,SA:2,GR:3,FO:4,CF:5,RK:6,MN:7,SN:8,DG:9,VI:10,BL:11,SW:12,VO:13,
+};
+// Colors (top, left, right) — mirrors bifrost-wac::biomes::BIOME_COLORS.
 const BC={
-  0:['#0c3080','#082058','#0a2870'], // deep water
+  0:['#0c3080','#082058','#0a2870'], // deep_water
   1:['#1860c8','#0e3888','#1450a8'], // water
   2:['#c8a868','#906030','#a87840'], // sand
   3:['#487840','#285828','#387030'], // grass
-  4:['#1e4820','#0e2c10','#182e18'], // dark forest
-  5:['#3a0810','#200408','#2a0408'], // crimson forest
+  4:['#1e4820','#0e2c10','#182e18'], // dark_forest
+  5:['#3a0810','#200408','#2a0408'], // crimson_forest
   6:['#686070','#484058','#585068'], // rock
   7:['#9898a8','#606070','#787888'], // mountain
   8:['#d8d8f0','#9898b8','#b8b8d8'], // snow
   9:['#181828','#0e0e1a','#141422'], // dungeon
-  10:['#80705a','#504438','#686050'],// village cobblestone
+  10:['#80705a','#504438','#686050'],// village
   11:['#a08870','#605040','#786050'],// building
   12:['#1a3a20','#102018','#162818'],// swamp
   13:['#2a0800','#1a0400','#200600'],// volcanic
 };
-const ZONE_NAMES={0:'Deep Sea',1:'Shore',2:'Sandy Banks',3:'Green Plains',4:'Dark Forest',
+// Display names — keys match BIOME_IDS indices.
+const ZONE_NAMES={
+  0:'Deep Sea',1:'Shore',2:'Sandy Banks',3:'Green Plains',4:'Dark Forest',
   5:'Crimson Forest',6:'Rocky Highlands',7:'Mountains',8:'Frost Peaks',9:'The Dungeon',
-  10:'Village',11:'Village',12:'Swamp',13:'Volcanic Wastes'};
+  10:'Village',11:'Building',12:'Swamp',13:'Volcanic Wastes',
+};
 
 // ── Voxel palette (for characters) ────────────────────────────────
 const PAL=[null,'#f0c8a0','#e8e0d0','#b0b0b8','#686878','#282838',
@@ -221,7 +233,9 @@ const PAL=[null,'#f0c8a0','#e8e0d0','#b0b0b8','#686878','#282838',
 function h2(x,y,s){let n=(Math.sin(x*127.1+y*311.7+s*74.3)*43758.5453);return n-Math.floor(n);}
 function sn(x,y,s){
   const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
-  const ux=xf*xf*(3-2*xf),uy=yf*yf*(3-2*yf);
+  // Quintic smoothstep — matches nexus/voxel-kernel/src/generator/noise.rs exactly.
+  // Previously cubic t*(3-2t): same seed produced a different world in JS vs Rust.
+  const ux=xf*xf*xf*(xf*(xf*6-15)+10),uy=yf*yf*yf*(yf*(yf*6-15)+10);
   return h2(xi,yi,s)*(1-ux)*(1-uy)+h2(xi+1,yi,s)*ux*(1-uy)+h2(xi,yi+1,s)*(1-ux)*uy+h2(xi+1,yi+1,s)*ux*uy;
 }
 function fbm(x,y,oct,s){let v=0,a=.5,f=1,m=0;for(let i=0;i<oct;i++){v+=sn(x*f,y*f,s+i*17)*a;m+=a;a*=.5;f*=2;}return v/m;}

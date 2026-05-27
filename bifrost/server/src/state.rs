@@ -6,7 +6,7 @@ use bifrost_chunk::{ChunkRegistry, PeerId};
 use bifrost_lockstep::LockstepScheduler;
 use bifrost_physics::PhysicsWorld;
 use bifrost_witness::WitnessExecutor;
-use bifrost_wac::{AssetCache, WorldDirector};
+use bifrost_wac::{AssetCache, WorldDirector, canonicalize_biome_id};
 use bifrost_run::WorldRunDirector;
 use bifrost_synthesis::AiFaction;
 use bifrost_safe_city::{SafeCity, Zone, ZoneId, ZoneState, ResourceMap};
@@ -58,13 +58,16 @@ impl SimState {
         // Seed a few starting zones so the API has data immediately.
         let mut zones: BTreeMap<ZoneId, Zone> = BTreeMap::new();
 
-        zones.insert("safe-city".into(), Zone::safe("safe-city", "plains"));
+        // Seed starting zones — biome IDs canonicalized via bifrost-wac::BiomeKey.
+        zones.insert("safe-city".into(), Zone::safe("safe-city",
+            canonicalize_biome_id("safe-city"))); // → "village"
 
-        for (id, biome, risk) in [
-            ("outer-east", "forest",  1u8),
-            ("outer-west", "desert",  1),
-            ("deep-north", "dungeon", 2),
+        for (id, legacy_biome, risk) in [
+            ("outer-east", "forest",  1u8),  // → "dark_forest"
+            ("outer-west", "desert",  1),    // → "sand"
+            ("deep-north", "dungeon", 2),    // already canonical
         ] {
+            let biome = canonicalize_biome_id(legacy_biome);
             zones.insert(id.into(), Zone {
                 id:        id.into(),
                 state:     ZoneState::Contested { leader: None, contest_strength: 0.0 },
