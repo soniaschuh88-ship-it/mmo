@@ -79,6 +79,12 @@ async fn main() {
         // World Director
         .route("/wac/director/tick",       post(api::director_tick))
         .route("/wac/director/history",    get(api::director_history))
+        // Nexus Voxel Kernel
+        .route("/nexus/wac",           post(api::nexus_wac))
+        .route("/nexus/biomes",        get(api::nexus_biomes))
+        .route("/nexus/chunk/:x/:y/:z",get(api::nexus_chunk))
+        .route("/nexus/world",         get(api::nexus_world_stats))
+        .route("/nexus/demo",          post(api::nexus_demo))
         // Shared state + CORS (allow all for development)
         .with_state(shared)
         .layer(CorsLayer::permissive());

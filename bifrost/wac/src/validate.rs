@@ -58,7 +58,7 @@ pub fn validate(bp: &AssetBlueprint) -> Result<(), WacError> {
         AssetIntent::LootTable       => validate_loot(bp),
         AssetIntent::AnimationGraph  => validate_animation(bp),
         AssetIntent::EntityPrefab    => validate_entity(bp),
-        AssetIntent::VoxelStructure  => Ok(()), // structural rules checked at physics level
+        AssetIntent::TileMap          => Ok(()), // 2-D tile map layout — minimal validation
     }
 }
 

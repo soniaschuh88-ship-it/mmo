@@ -542,3 +542,139 @@ pub async fn director_history(State(shared): State<SharedState>) -> Json<serde_j
         "config": s.director.config,
     }))
 }
+
+// ─── Nexus Voxel Kernel ────────────────────────────────────────────────────────
+
+use nexus_voxel_kernel::bridge::{WacError, WacResult};
+use nexus_voxel_kernel::core::ChunkPos;
+
+/// Apply a WAC JSON document to the nexus voxel kernel.
+///
+/// Generates a `VoxelChunk` deterministically and caches it in the
+/// `WorldRuntime`. Returns chunk metadata including position, biome,
+/// fill count, and BLAKE3 state hash.
+///
+/// # Example
+///
+/// ```bash
+/// curl -X POST http://localhost:8080/nexus/wac \
+///   -H 'Content-Type: application/json' \
+///   -d '{"type":"chunk","pos":{"x":0,"y":0,"z":0},"biome":"crimson_forest"}'
+/// ```
+pub async fn nexus_wac(
+    State(shared): State<SharedState>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let wac_str = match serde_json::to_string(&body) {
+        Ok(s)  => s,
+        Err(e) => return (StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("invalid JSON: {e}") }))).into_response(),
+    };
+    let mut s = shared.lock().await;
+    match s.nexus_rt.apply(&wac_str) {
+        Ok(WacResult::ChunkGenerated(chunk)) => {
+            Json(json!({
+                "ok":         true,
+                "chunk_pos":  { "x": chunk.position.x, "y": chunk.position.y, "z": chunk.position.z },
+                "biome":      chunk.meta.biome,
+                "seed":       chunk.meta.seed,
+                "fill_count": chunk.meta.fill_count,
+                "state_hash": hex::encode(chunk.state_hash),
+                "nav_passable": chunk.meta.nav_passable,
+            })).into_response()
+        }
+        Ok(WacResult::RegionGenerated(chunks)) => {
+            let summaries: Vec<_> = chunks.iter().map(|c| json!({
+                "pos":        { "x": c.position.x, "y": c.position.y, "z": c.position.z },
+                "biome":      c.meta.biome,
+                "fill_count": c.meta.fill_count,
+                "state_hash": hex::encode(&c.state_hash[..4]),
+            })).collect();
+            Json(json!({ "ok": true, "chunks": summaries, "count": summaries.len() })).into_response()
+        }
+        Ok(WacResult::BiomeRegistered(name)) => {
+            Json(json!({ "ok": true, "registered_biome": name })).into_response()
+        }
+        Ok(WacResult::MaterialRegistered { name, id }) => {
+            Json(json!({ "ok": true, "registered_material": name, "id": id })).into_response()
+        }
+        Err(WacError::Json(e)) => (StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("JSON error: {e}") }))).into_response(),
+        Err(WacError::UnknownTerrain(t)) => (StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("unknown terrain style: {t}") }))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST,
+            Json(json!({ "error": e.to_string() }))).into_response(),
+    }
+}
+
+/// List all registered biomes (built-in + AI-registered).
+pub async fn nexus_biomes(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let names: Vec<&str> = s.nexus_rt.world.biomes.names().collect();
+    Json(json!({ "biomes": names, "count": names.len() }))
+}
+
+/// Get chunk data from the nexus world cache.
+pub async fn nexus_chunk(
+    State(shared): State<SharedState>,
+    Path((x, y, z)): Path<(i32, i32, i32)>,
+) -> impl IntoResponse {
+    let s = shared.lock().await;
+    match s.nexus_rt.world.get_chunk(ChunkPos::new(x, y, z)) {
+        None => (StatusCode::NOT_FOUND,
+            Json(json!({ "error": "chunk not loaded — POST /nexus/wac first" }))).into_response(),
+        Some(chunk) => Json(json!({
+            "pos":        { "x": x, "y": y, "z": z },
+            "biome":      chunk.meta.biome,
+            "seed":       chunk.meta.seed,
+            "fill_count": chunk.meta.fill_count,
+            "surface_y":  chunk.meta.surface_y,
+            "nav_passable": chunk.meta.nav_passable,
+            "state_hash": hex::encode(chunk.state_hash),
+        })).into_response(),
+    }
+}
+
+/// Return nexus world statistics.
+pub async fn nexus_world_stats(State(shared): State<SharedState>) -> Json<serde_json::Value> {
+    let s = shared.lock().await;
+    let w = &s.nexus_rt.world;
+    let biome_names: Vec<&str> = w.biomes.names().collect();
+    Json(json!({
+        "chunks_loaded":  w.chunk_count(),
+        "total_voxels":   w.total_voxels(),
+        "biomes_available": biome_names.len(),
+        "palette_size":   w.palette.len(),
+        "pending_requests": s.nexus_rt.streamer.pending_count(),
+        "generated_count":  s.nexus_rt.streamer.generated_count(),
+    }))
+}
+
+/// Generate a demo chunk using a random biome to show nexus pipeline.
+pub async fn nexus_demo(State(shared): State<SharedState>) -> impl IntoResponse {
+    let demo_wacs = [
+        r#"{"type":"chunk","pos":{"x":0,"y":0,"z":0},"biome":"crimson_forest"}"#,
+        r#"{"type":"chunk","pos":{"x":0,"y":0,"z":1},"biome":"volcanic_wastes"}"#,
+        r#"{"type":"chunk","pos":{"x":1,"y":0,"z":0},"biome":"crystal_caves"}"#,
+    ];
+    let mut results = Vec::new();
+    let mut s = shared.lock().await;
+    for wac in demo_wacs {
+        match s.nexus_rt.apply(wac) {
+            Ok(WacResult::ChunkGenerated(c)) => {
+                results.push(json!({
+                    "pos":   { "x": c.position.x, "y": c.position.y, "z": c.position.z },
+                    "biome": c.meta.biome,
+                    "fill":  c.meta.fill_count,
+                    "hash":  hex::encode(&c.state_hash[..4]),
+                }));
+            }
+            _ => {}
+        }
+    }
+    Json(json!({
+        "ok":     true,
+        "chunks": results,
+        "msg":    "Nexus voxel kernel: LLM → WAC → VoxelChunk pipeline working.",
+    })).into_response()
+}

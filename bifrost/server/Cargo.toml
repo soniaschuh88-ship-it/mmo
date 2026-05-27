@@ -28,3 +28,4 @@ bifrost-lockstep = { workspace = true }
 bifrost-witness  = { workspace = true }
 bifrost-physics  = { workspace = true }
 bifrost-wac      = { workspace = true }
+nexus-voxel-kernel = { workspace = true }

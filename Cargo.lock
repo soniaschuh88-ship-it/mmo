@@ -172,6 +172,7 @@ dependencies = [
  "bifrost-wac",
  "bifrost-witness",
  "hex",
+ "nexus-voxel-kernel",
  "serde",
  "serde_json",
  "thiserror",

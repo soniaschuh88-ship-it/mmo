@@ -7,6 +7,7 @@ use bifrost_lockstep::LockstepScheduler;
 use bifrost_physics::PhysicsWorld;
 use bifrost_witness::WitnessExecutor;
 use bifrost_wac::{AssetCache, WorldDirector};
+use nexus_voxel_kernel::bridge::RuntimeAdapter;
 use tokio::sync::Mutex;
 
 /// The live simulation state shared across all HTTP handlers.
@@ -27,6 +28,10 @@ pub struct SimState {
     pub asset_cache:    AssetCache,
     /// World Director — reads pressure graph, emits AssetBlueprints.
     pub director:       WorldDirector,
+
+    // ── Nexus Voxel Kernel ────────────────────────────────────────────────────
+    /// Nexus WAC runtime: LLM/AI → VoxelChunk pipeline.
+    pub nexus_rt:       RuntimeAdapter,
 }
 
 impl SimState {
@@ -39,6 +44,7 @@ impl SimState {
             peers:          Vec::new(),
             asset_cache:    AssetCache::new(),
             director:       WorldDirector::default(),
+            nexus_rt:       RuntimeAdapter::new(),
         }
     }
 

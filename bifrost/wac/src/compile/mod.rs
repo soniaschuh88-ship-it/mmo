@@ -23,16 +23,14 @@ pub fn compile(bp: &AssetBlueprint) -> Result<AssetIR, WacError> {
         AssetIntent::LootTable       => CompiledAsset::LootTable(loot::compile(bp)?),
         AssetIntent::AnimationGraph  => CompiledAsset::AnimationGraph(animation::compile(bp)?),
         AssetIntent::EntityPrefab    => CompiledAsset::EntityPrefab(entity::compile(bp)?),
-        AssetIntent::VoxelStructure  => {
-            // Voxel generation is physics-level; return a minimal stub IR.
-            CompiledAsset::VoxelChunk(crate::types::VoxelChunkIR {
-                id:               bp.id.to_string(),
-                size:             (16, 16, 16),
-                seed:             bp.seed,
-                material_palette: vec!["air".into(), "stone".into()],
-                blocks:           vec![],
-            })
-        }
+        // TileMap: 2-D world layout (replaces old VoxelStructure 3-D intent)
+        AssetIntent::TileMap         => CompiledAsset::TileMap(crate::types::TileMapIR {
+            id:           bp.id.to_string(),
+            seed:         bp.seed,
+            size:         (64, 64),
+            tile_palette: vec!["air".into(), "grass".into(), "stone".into()],
+            tiles:        vec![],
+        }),
     };
 
     Ok(AssetIR {
