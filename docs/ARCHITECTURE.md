@@ -1,5 +1,7 @@
-# bKG Architecture — Distributed Reality Compute Fabric
+# bKG — Bifrost Architecture
 
+> *bKG · best known Garbage · Distributed Reality Compute Fabric*
+>
 > Single source of truth. DELPHOS decides. Players compute.
 
 ---

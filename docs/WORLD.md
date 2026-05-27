@@ -1,211 +1,205 @@
-🧠 1. GRUNDARCHITEKTUR (NEUER CORE LOOP)
-WORLD SIMULATION LOOP
+# bKG — World Design
 
-Tick:
-  1. World State Snapshot (BIFROST)
-  2. Faction AI Planning (SYNTHESIS)
-  3. Player Intent Collection
-  4. SAFE CITY ROUTING (MARKET HUB)
-  5. WAC Compilation (builds changes)
-  6. Physics + Economy Resolution
-  7. Persistence (ledger)
-🏙️ 2. SAFE CITY SYSTEM (ZENTRALER KNOTEN)
+> The world is not an endless map. It is a **discrete competitive epoch** that evolves, resolves, and regenerates.
 
-Das ist dein Anti-Chaos-Anker im MMO.
+---
 
-Definition
-pub struct SafeCity {
-    pub id: ZoneId,
-    pub protection_level: f32,
-    pub allowed_actions: Vec<ActionType>,
-    pub market: AuctionHouse,
-    pub crafting_laws: CraftingRules,
-    pub respawn_hub: RespawnPolicy,
-}
-Eigenschaften
-✔ Keine Combat Events
-✔ Kein Territory Capture
-✔ Kein Biome Destruction
-✔ Nur:
-Handel
-Crafting
-Craft Fusion
-Skill progression
-AI + Player interaction
-🏦 3. ACTION HOUSE = EINZIGER GLOBALER MARKT
+## 1. The Run System
 
-Das ist dein Herzstück.
+The world operates in **runs** — discrete competitive seasons with a fixed duration or win condition.
 
-Player ⇄ Safe City Auction House ⇄ AI Faction ⇄ Economy Graph
-Struktur
-pub struct AuctionHouse {
-    pub listings: Vec<Listing>,
-    pub tax_rate: f32,
-    pub faction_influence: HashMap<FactionId, f32>,
-}
-WICHTIG:
+```
+Run N
+  │
+  ├── Human factions compete for zone control
+  ├── Synthesis AI civilization competes using the same rules
+  ├── Resources extracted, bases built, territory fought over
+  │
+  └── EndCondition reached
+        │
+        ├── Winner effects applied
+        ├── World Director generates next world
+        └── Run N+1 begins
+```
 
-👉 Kein globales free trading
-👉 Alles geht durch Safe City Gate
+### End Conditions
 
-Das verhindert:
+| Condition | Description |
+|---|---|
+| `FirstToControlZones(n)` | Control *n* zones simultaneously |
+| `FirstToReachTechLevel(n)` | Advance faction tech tree to level *n* |
+| `EconomicDominance(f)` | Control fraction *f* of total auction house volume |
+| `SurvivalUntilTime(t)` | Survive until tick *t* |
 
-Inflation Exploits
-duping loops
-AI economy collapse
-🧱 4. BASE BUILDING SYSTEM (WAC POWERED)
+Multiple victory paths prevent a single dominant meta strategy.
 
-Spieler bauen keine “prefabs”.
+---
 
-Sie bauen WAC-generierte Strukturen mit Regeln.
+## 2. World Generation Pipeline
 
-Player Base = Asset Cluster
-pub struct PlayerBase {
-    pub owner: PlayerId,
-    pub zone: ZoneId,
+Each run end triggers deterministic world regeneration:
 
-    pub structures: Vec<WacAsset>,
-    pub biome_modifiers: Vec<BiomeRule>,
-    pub defense_matrix: DefenseGraph,
-}
-BUILD FLOW
-Player Intent
-   ↓
-WAC Blueprint
-   ↓
-Validation (IVL)
-   ↓
-Voxel / Entity / Loot compilation
-   ↓
-World injection
-WICHTIG
+```
+Run End
+  → WorldRunDirector evaluates result
+  → PressureGraph built from run outcome
+  → WorldDirector ticks (WAC blueprint emission)
+  → WAC compiles biome + loot + faction assets
+  → nexus-voxel-kernel generates new world chunks
+  → Run N+1 begins
+```
 
-Base building ist nicht “placement”.
+The AI **analyzes the previous run meta** and generates **counter-worlds**:
 
-Es ist:
+| Previous dominant strategy | Next world adaptation |
+|---|---|
+| Economy exploitation | Scarcity biomes, volatile markets |
+| Fortress turtling | Open terrain, mobile resource nodes |
+| Zerg rush | Defensive biome evolution, choke points |
 
-🧠 "Rule injection into world physics"
+---
 
-☠️ 5. PERMADEATH + CLONING SYSTEM (EVE++, ABER STABILER)
+## 3. Winner / Loser Effects
 
-Das ist der gefährlichste Teil, also sauber designen.
+### Winners receive
+- Permanent meta-progression unlocks
+- Rare loot injection into account vault
+- Cosmetic and functional world perks
+- Access to next tier world
 
-PLAYER LIFE MODEL
+### Losers receive
+- Soft skill decay (not a full wipe)
+- Reduced starting resources next run
+- Reputation penalty in AI systems
+
+> No hard wipe. Meta-progression **imbalance**, not destruction.
+
+---
+
+## 4. Meta Progression System
+
+Two separate progression layers:
+
+| Layer | Scope | Contains |
+|---|---|---|
+| **Run Progression** | Resets per run | Skills, gear, bases, territory |
+| **Meta Progression** | Persistent | Unlocks, archetypes, starting perks, faction tech trees |
+
+`PLAYER POWER = RUN STATE + META STATE`
+
+---
+
+## 5. Zone Control System
+
+```
+SAFE CITY ──── permanent anchor, no combat, auction house
+OUTER ZONES ── contested, war economy, medium risk
+DEEP ZONES ─── high risk, high reward, boss encounters
+```
+
+### Zone States
+
+| State | Description |
+|---|---|
+| `Safe` | Protected zone, no combat events |
+| `Contested` | Multiple factions competing for influence |
+| `Controlled(faction)` | Single faction holds majority influence |
+| `Collapsing` | Resources exhausted, biome corrupting |
+
+Zones change ownership through influence accumulation, infrastructure buildup, combat resolution, and economic pressure.
+
+---
+
+## 6. Safe City
+
+The Safe City is the persistent cross-run anchor:
+
+- **Survives across all runs** — never destroyed, never captured
+- **Auction house** — the only global market; all trades route through it
+- **Crafting hub** — WAC-powered structure creation
+- **Respawn anchor** — guaranteed respawn point
+- **Skill progression** — meta progression happens here
+
+### Why Safe City Matters
+
+Without it: `chaos + inflation + AI dominance`  
+With it: `controlled chaos with stable meta-economy`
+
+The Auction House prevents:
+- Inflation exploits
+- Duplication loops
+- AI economy collapse
+
+---
+
+## 7. Biome Evolution During a Run
+
+Biomes are **not static**. They evolve in response to world events:
+
+| Trigger | Biome Effect |
+|---|---|
+| Combat intensity | Terrain corruption, crater formation |
+| Economy imbalance | Resource mutation, scarcity zones |
+| AI pressure | Defensive biome adaptation |
+| Player inaction | Forest overgrowth, reclamation |
+
+---
+
+## 8. Economy Model
+
+```
+SAFE CITY:   stable economy · crafting hub · respawn anchor
+OUTER ZONES: volatile economy · faction influence · loot-driven survival
+DEEP ZONES:  high-risk loot · boss mechanics · no respawn guarantee
+```
+
+Loot is **not static** — it is generated per run based on:
+- Current biome state
+- Faction dominance
+- AI adaptation
+- World Director pressure graph
+
+---
+
+## 9. Player Entity Model
+
+```rust
 pub struct PlayerEntity {
-    pub id: PlayerId,
-    pub body: Option<BodyId>,
+    pub id:            PlayerId,
+    pub body:          Option<BodyId>,
     pub clone_charges: u32,
-    pub memory_core: MemoryGraph,
+    pub memory_core:   MemoryGraph,
 }
-DEATH FLOW
+```
+
+### Death Flow
+
 1. Body dies
 2. Memory snapshot saved
-3. Inventory split:
-   - lost items (world drops)
-   - secured items (safe city vault)
-4. Clone spawn (if available)
-CLONING RULE
-Clone = same memory graph
-BUT:
-- small entropy drift (anti-perfect exploit)
-- skill decay on death
-RESULT
+3. Inventory split: lost items (world drops) + secured items (safe city vault)
+4. Clone spawns if charges available — same memory graph, small entropy drift
 
-👉 Kein echter permadeath für Progression
-👉 aber echter Verlust für Risiko
-👉 verhindert “careless gameplay”
+> No true permadeath for progression, but real loss for risk-taking.
 
-🧠 6. KI + PLAYER SAFE CITY INTERACTION
+---
 
-Beide Seiten benutzen:
+## 10. World Tick Loop
 
-Auction House
-Crafting System
-Trade Routes
-KI BEHAVIOR IN SAFE CITY
-Synthesis AI:
-- buys resources
-- manipulates economy
-- invests in zones
-- spies on player crafting trends
+```
+Each Tick:
+  1. World State Snapshot  (bifrost-lockstep)
+  2. Synthesis AI Planning (bifrost-synthesis)
+  3. Player Intent Collection
+  4. Safe City routing     (bifrost-safe-city)
+  5. WAC compilation       (bifrost-wac)
+  6. Physics + Economy resolution (bifrost-physics)
+  7. Persistence           (event ledger)
+```
 
-👉 KI spielt Wirtschaftsspiel ernsthaft
+---
 
-🧱 7. WORLD DESIGN SYSTEM (GLOBAL META)
+## See Also
 
-Du brauchst jetzt einen Layer über allem:
-
-WORLD DIRECTOR
-pub struct WorldDirector {
-    pub biome_pressure_map: PressureField,
-    pub faction_balance: BalanceMatrix,
-    pub economic_stability: f32,
-}
-Aufgaben
-verhindert KI snowball
-erzeugt Konflikte in Zonen
-reguliert resource scarcity
-triggert world events
-⚔️ 8. ZONE WARFARE SYSTEM
-SAFE CITY → HUB
-OUTER ZONES → WAR ECONOMY
-DEEP ZONES → HIGH RISK HIGH REWARD
-Zone States
-pub enum ZoneState {
-    Safe,
-    Contested,
-    Controlled(FactionId),
-    Collapsing,
-}
-🧠 9. GESAMTÖKONOMIE (KRITISCH)
-SAFE CITY:
-- stable economy
-- crafting hub
-- respawn anchor
-
-OUTSIDE:
-- volatile economy
-- faction influence
-- loot-driven survival
-🔥 10. DESIGN RESULT
-
-Du hast jetzt:
-
-✔ KI-Zivilisation
-✔ Player Civilization
-✔ Shared Economy Gate
-✔ Safe City Anchor
-✔ Deterministic World Engine
-✔ Permadeath + Clone system
-🧨 WICHTIGSTER DESIGN-POINT
-
-Ohne Safe City wäre dein System:
-
-Chaos + Inflation + AI dominance
-
-Mit Safe City:
-
-kontrolliertes Chaos mit stabiler Meta-Ökonomie
-
-🚀 NEXT STEP 
-
-
-
-👉 “Safe City Server Module (Rust)”
-Auction House backend
-Crafting validation engine
-anti-exploit economy rules
-
-und
-
-👉 “World Director v1”
-KI + Player balance system
-faction scaling logic
-zone evolution engine
-
-und 
-
-👉 “Clone Memory System”
-deterministic player identity graph
-death reconstruction pipeline
-
+- [`docs/FACTION.md`](FACTION.md) — Synthesis AI civilization design
+- [`docs/WAC.md`](WAC.md) — World Asset Compiler pipeline
+- [`docs/BIFROST-SPEC.md`](BIFROST-SPEC.md) — Protocol specification

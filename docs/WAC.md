@@ -1,206 +1,181 @@
-🧱 NEUER KERN: LLM → WORLD ASSET COMPILER (WAC)
-Ziel
+# bKG — World Asset Compiler (WAC)
 
-Text → strukturierte, engine-validierte Assets:
+> LLM or designer intent → strictly typed, validated, deterministic asset IR → BIFROST world.
 
-Voxel-Chunks
-Biome Definitions
-Loot Tables
-Animation State Machines
-Entity Prefabs
+---
 
-NICHT:
+## 1. Core Rule
 
-freie JSON Fantasie
-nicht validierte LLM Outputs
+```
+LLM MAY:              LLM MAY NOT:
+  describe rules        set voxels directly
+  define constraints    spawn loot directly
+  specify semantics     define animation frames
+  provide a seed        mutate world state
+```
 
-SONDERN:
+LLM output **never touches the engine directly**. It always goes through validation and compilation.
 
-strikt typisierte, versionierte Asset IR
-🧠 PIPELINE ERWEITERUNG
-LLM
- ↓
-Intent (IVL validiert)
- ↓
-World Asset Compiler (NEU)
- ↓
-Validated Asset IR
- ↓
-Asset Runtime Translator
- ↓
-BIFROST / Server / Renderer
-🧩 CORE DESIGN
-1. Asset Intent Types
-pub enum AssetIntent {
-    VoxelStructure,
-    BiomeDefinition,
-    LootTable,
-    AnimationGraph,
-    EntityPrefab,
-}
-2. LLM OUTPUT DARF NIE DIREKT ENGINE TOUCHEN
+---
 
-LLM erzeugt nur:
+## 2. Pipeline
 
+```
+LLM / Designer / AI Faction Intent
+          ↓
+  AssetBlueprint  (spec + constraints + seed)
+          ↓
+  validate()   ← WacError on violation
+          ↓
+  compile()    → AssetIR (typed, version-stamped)
+          ↓
+  AssetCache   (BLAKE3 key = semantic hash)
+          ↓
+  Runtime Translators:
+    voxel_engine · loot_engine · animation_engine · biome_engine
+          ↓
+  BIFROST WORLD
+```
+
+---
+
+## 3. Asset Intent Types
+
+| Intent | Description |
+|---|---|
+| `TileMap` | 2-D tile map layout (structure, dungeon, base) |
+| `BiomeDefinition` | Terrain generation rules, materials, entity spawns |
+| `LootTable` | Drop table with conditional entries |
+| `AnimationGraph` | Entity animation state machine |
+| `EntityPrefab` | Fully specified entity (stats + behavior + animation) |
+
+---
+
+## 4. Asset Blueprint
+
+```rust
 pub struct AssetBlueprint {
-    pub id: Uuid,
-    pub asset_type: AssetIntent,
-
-    pub natural_language_spec: String,
-
-    pub constraints: Vec<String>,
-
-    pub seed: u64,
+    pub id:                    Uuid,
+    pub asset_type:            AssetIntent,
+    pub natural_language_spec: String,   // "ein biome mit roten kristallwäldern"
+    pub constraints:           Vec<String>, // "no floating tiles"
+    pub seed:                  u64,      // must not be zero
 }
-🧠 WORLD ASSET COMPILER (WAC)
-Hauptjob:
+```
 
-Text → constrained deterministic generation
+---
 
-Example Flow
-Input (LLM / Designer / NPC god prompt)
+## 5. Biome System — bifrost-wac is the World Type Authority
 
-„ein biome mit roten kristallwäldern die nachts leuchten und aggressive loot fledermäuse enthalten“
+Biome definitions live in `bifrost/wac/src/biomes.rs`. Every system reads from `BiomeRegistry::global()`.
 
-Step 1: Parse to IR
-{
-  "type": "BiomeDefinition",
-  "biome_name": "Crimson Lumen Forest",
-  "rules": [
-    "terrain: dense forest",
-    "dominant_material: crystal_red",
-    "emission: nocturnal glow",
-    "hostile_entities: loot_bats"
-  ],
-  "constraints": [
-    "no floating voxels",
-    "navmesh must remain connected"
-  ],
-  "seed": 918273
+```rust
+pub struct BiomeDefinition {
+    pub id:                      BiomeKey,
+    pub temperature:             f32,
+    pub humidity:                f32,
+    pub colors:                  (&'static str, &'static str, &'static str),
+    pub ambient_fx:              AmbientFx,
+    pub risk_tier:               u8,
+    pub hostile_density:         f32,
+    pub strategic_value:         f32,  // Synthesis AI scoring
+    pub loot_weight_multiplier:  f32,
+    pub mutation_cost:           f32,  // World Director budget
+    pub passable:                bool,
+    pub voxel_fill_rate:         f32,
 }
-Step 2: Validation Layer (EXTENSION von IVL)
-fn validate_asset(asset: &AssetBlueprint) -> Result<()> {
-    ensure!(asset.seed != 0);
-    ensure!(is_allowed_asset_type(asset.asset_type));
+```
 
-    match asset.asset_type {
-        BiomeDefinition => validate_biome_rules(asset)?,
-        VoxelStructure => validate_voxel_physics(asset)?,
-        LootTable => validate_economy_balance(asset)?,
-        _ => {}
-    }
+### Canonical Biome IDs
 
-    Ok(())
-}
-🧱 VOXEL GENERATION LAYER (CRITICAL)
-Deterministic voxel output
-pub struct VoxelChunk {
-    pub size: (u32, u32, u32),
-    pub seed: u64,
-    pub blocks: Vec<Voxel>,
-}
-Generation rule
+| Index | ID | Display |
+|---|---|---|
+| 0 | `deep_water` | Deep Sea |
+| 1 | `water` | Shore |
+| 2 | `sand` | Sandy Banks |
+| 3 | `grass` | Green Plains |
+| 4 | `dark_forest` | Dark Forest |
+| 5 | `crimson_forest` | Crimson Forest |
+| 6 | `rock` | Rocky Highlands |
+| 7 | `mountain` | Mountains |
+| 8 | `snow` | Frost Peaks |
+| 9 | `dungeon` | The Dungeon |
+| 10 | `village` | Village |
+| 11 | `building` | Building |
+| 12 | `swamp` | Swamp |
+| 13 | `volcanic` | Volcanic Wastes |
 
-LLM darf NICHT voxel-by-voxel entscheiden.
+Index = tile-palette index shared between Rust and the JS `BIOME` constant.
 
-Nur:
+---
 
-Biome IR → procedural generator → voxel result
-Example mapping
-"crystal forest" → generator preset:
-- tree density: high
-- material palette: crystal_red, obsidian_black
-- light emission: sine wave flicker
-🧠 BIOME SYSTEM (SEMANTIC LAYER)
-pub struct Biome {
-    pub id: String,
-    pub temperature: f32,
-    pub humidity: f32,
+## 6. Loot System
 
-    pub voxel_rules: VoxelRules,
-    pub entity_spawns: Vec<SpawnRule>,
-    pub loot_distribution: LootGraph,
-}
-🎁 LOOT SYSTEM (IMPORTANT)
+LLM defines **loot logic**, not items:
 
-LLM darf nur LOOT LOGIC definieren:
-
+```
 "rare crystals drop from glowing bats at night"
+```
 
-→ Compiler macht:
+WAC compiles to:
 
+```rust
 LootTable {
     entries: [
-        {
-            item: "crystal_shard",
-            drop_rate: 0.03,
-            conditions: [Night, BatKill, Biome(CrystalForest)]
-        }
+        { item: "crystal_shard", drop_rate: 0.03,
+          conditions: [Night, BatKill, Biome(CrimsonForest)] }
     ]
 }
-🎬 ANIMATION SYSTEM (GAME CRITICAL)
+```
 
-Du brauchst kein LLM Output wie “animiere fliegen”.
+---
 
-Du brauchst:
+## 7. Animation Graph
 
-pub struct AnimationGraph {
-    pub states: Vec<State>,
-    pub transitions: Vec<Transition>,
-}
-Example IR
+WAC produces state machine IR that `nova-anim::AnimStateMachine` can consume directly:
+
+```json
 {
   "states": ["idle", "search", "attack", "flee"],
   "transitions": [
-    {"from": "idle", "to": "search", "condition": "player_near"},
-    {"from": "search", "to": "attack", "condition": "enemy_visible"}
+    { "from": "idle",   "to": "search", "condition": "player_near" },
+    { "from": "search", "to": "attack", "condition": "enemy_visible" }
   ]
 }
-🧨 HARD RULE (wichtig für dein System)
-LLM DARF NIE:
-Voxels direkt setzen
-Loot direkt spawnen
-Animation frames definieren
-World state mutieren
-LLM DARF NUR:
-Regeln beschreiben
-Constraints definieren
-Semantik erzeugen
-🧠 NEUE ARCHITEKTUR
-LLM
- ↓
-Intent Layer (IVL)
- ↓
-Asset Blueprint Layer (WAC INPUT)
- ↓
-Deterministic Compiler (WAC)
- ↓
-Validated Asset IR
- ↓
-Runtime Translators:
-   - voxel_engine
-   - loot_engine
-   - animation_engine
-   - biome_engine
- ↓
-BIFROST WORLD
-🚀 OPTIONAL UPGRADE (SEHR WICHTIG)
-"Reality Compiler Cache"
+```
 
-Damit dein System nicht jedes Mal LLM braucht:
+---
 
+## 8. Asset Cache
+
+Identical intent + seed → identical world:
+
+```rust
 pub struct AssetCache {
-    pub semantic_hash: BLAKE3,
-    pub compiled_asset: AssetIR,
+    // BLAKE3(spec + constraints + seed) → compiled AssetIR
 }
+```
 
-→ gleiche Idee = gleiche Welt
+Same natural-language spec with the same seed always produces the same world, no matter who calls it.
 
-🧠 REAL TALK
+---
 
-Wenn du das so baust:
+## 9. NVIDIA NIM Integration
 
-dein MMO wird replaybar
-jede Welt ist deterministisch rekonstruierbar
-LLM wird ein „World Design Coprocessor“
-nicht mehr ein „Chaos Generator“
+The `nvidia-nim` feature enables LLM-backed spec generation:
+
+```
+Synthesis AI Intent → NimClient::generate_asset_spec() → natural_language_spec → WAC
+```
+
+Environment variables:
+- `NVIDIA_API_KEY` — bearer token
+- `NVIDIA_NIM_BASE_URL` — default: `https://integrate.api.nvidia.com/v1`
+- `NVIDIA_NIM_MODEL` — default: `meta/llama-3.3-70b-instruct`
+
+---
+
+## See Also
+
+- [`docs/WORLD.md`](WORLD.md) — World generation pipeline
+- [`docs/BIFROST-SPEC.md`](BIFROST-SPEC.md) — Bifrost protocol
