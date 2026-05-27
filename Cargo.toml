@@ -8,6 +8,7 @@ members = [
     "bifrost/physics",
     "bifrost/server",
     "bifrost/aigm",
+    "bifrost/wac",
     "nexus/voxel-kernel",
 ]
 
@@ -51,4 +52,5 @@ bifrost-lockstep = { path = "bifrost/lockstep" }
 bifrost-witness  = { path = "bifrost/witness" }
 bifrost-physics  = { path = "bifrost/physics" }
 bifrost-server   = { path = "bifrost/server" }
+bifrost-wac      = { path = "bifrost/wac" }
 nexus-voxel-kernel = { path = "nexus/voxel-kernel" }
