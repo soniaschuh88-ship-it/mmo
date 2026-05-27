@@ -158,6 +158,8 @@ body{background:#05050e;color:#e0d8c8;font-family:'Segoe UI',monospace;overflow:
     </div>
   </div>
   <div id="zone-label"></div>
+  <!-- Server status dot -->
+  <div id="srv-dot" title="bifrost-server" style="position:absolute;top:12px;right:130px;width:7px;height:7px;border-radius:50%;background:#333;pointer-events:none;transition:background .5s"></div>
   <div id="g-btns">
     <button class="gbtn" id="btn-q">📜 Quests</button>
     <button class="gbtn" id="btn-sk">✨ Skills (K)</button>
@@ -646,8 +648,12 @@ let inDlg=null,target=null,lastAtk=0;
 const keys={};
 const PARTICLES=[];
 const FLOATS=[];
+// Ring effects (death explosions, spell rings)
+const RINGS=[];
 let hotbar=[null,null,null,null];
-let dayTime=0.5; // 0=midnight, 0.5=noon, 1=midnight
+let dayTime=0.5;
+// Screen shake
+let shakeX=0,shakeY=0,shakeDur=0,shakeAmt=0;
 
 function initGame(name,cls){
   const c=CLASSES[cls];
@@ -666,6 +672,23 @@ function initGame(name,cls){
   monsters=spMon.map(m=>({...m,hp:m.maxHp,alive:true,animHit:0,stunUntil:0,missCount:0,
     anim:'idle',animF:0,animT:0,facing:0,moving:false}));
   updateHUD();buildHotbar();renderMinimap();
+  // Connect to bifrost-server + show nexus biomes
+  fetchServerStatus();
+}
+
+let serverBiomes=[];
+async function fetchServerStatus(){
+  try{
+    const r=await fetch('/api/health');
+    if(r.ok){
+      document.getElementById('srv-dot').style.background='#4a4';
+      // Fetch nexus biome list
+      const br=await fetch('/api/nexus/biomes');
+      if(br.ok){const bd=await br.json();serverBiomes=bd.biomes||[];}
+      // Fetch nexus demo in background
+      fetch('/api/nexus/demo',{method:'POST'}).catch(()=>{});
+    }
+  }catch(_){/* server offline — game still works standalone */}
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -909,12 +932,16 @@ function drawEntity(e,now,isPlayer){
   if(sx<-80||sx>CW+80||sy<-100||sy>CH+60)return;
 
   const isBoss=e.boss;
+  // NPC idle bob offset (gentle sine wave)
+  const isNpc=e.questId!==undefined&&e.type===undefined;
+  const bobY=isNpc?Math.sin(now*.002+e.wx*.7)*3:0;
+
   // Shadow
-  ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();
   ctx.ellipse(sx,sy+IH/2-2,(isBoss?20:13),(isBoss?7:4),0,0,Math.PI*2);ctx.fill();
 
   if(isPlayer){
-    // Draw voxel character model
+    // Draw voxel character model with hurt flash
     let sprite;
     if(e.anim==='hurt'){
       sprite=buildHurtSprite(e.cls,e.facing);
@@ -927,20 +954,32 @@ function drawEntity(e,now,isPlayer){
       ctx.imageSmoothingEnabled=false;
       const sc=isBoss?1.4:1;
       const sw=sprite.width*sc,sh=sprite.height*sc;
-      ctx.drawImage(sprite,sx-sw/2,sy-sh+IH/2,sw,sh);
+      // Screen shake offset applied here
+      ctx.drawImage(sprite,sx-sw/2+shakeX,sy-sh+IH/2+shakeY,sw,sh);
     }
   }else{
-    // NPC/monster: colored voxel-style block
+    // NPC/monster: animated voxel-style sprite
     const col=e.animHit>0?'#ffffff':(e.col||'#808080');
     if(e.animHit>0)e.animHit--;
-    const rad=isBoss?20:13;
+    const rad=isBoss?22:13;
+
+    // Monster walk bob
+    const walkBob=e.moving?Math.sin(now*.012)*2:0;
+    const drawY=sy+bobY+walkBob;
+
+    // Glow for bosses
+    if(isBoss){
+      ctx.shadowColor='#c040c0';ctx.shadowBlur=20;
+    }
     ctx.fillStyle=col;
-    ctx.beginPath();ctx.ellipse(sx,sy-rad,rad*.75,rad,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle=e.boss?'#c040c0':'rgba(255,255,255,.35)';
-    ctx.lineWidth=e.boss?3:1.5;ctx.stroke();ctx.lineWidth=1;
-    // Icon
-    ctx.font=`${isBoss?18:12}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(e.icon||'?',sx,sy-rad);
+    ctx.beginPath();ctx.ellipse(sx,drawY-rad,rad*.78,rad,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=isBoss?'#d060e0':'rgba(255,255,255,.35)';
+    ctx.lineWidth=isBoss?3:1.5;ctx.stroke();ctx.lineWidth=1;
+    ctx.shadowBlur=0;
+
+    // Icon with size scaling for bosses
+    ctx.font=`${isBoss?20:13}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(e.icon||'?',sx,drawY-rad);
   }
 
   // HP bar (monsters)
@@ -981,6 +1020,23 @@ function drawParticle(p){
   ctx.globalAlpha=1;
 }
 
+function spawnRing(wx,wy,col,maxR,speed){
+  const{sx,sy}=w2s(wx,wy,tileH(wx,wy));
+  RINGS.push({sx,sy,r:4,maxR,speed,col,t:0});
+}
+
+function drawRings(){
+  for(let i=RINGS.length-1;i>=0;i--){
+    const ring=RINGS[i];
+    ring.r+=ring.speed;ring.t+=.04;
+    if(ring.r>ring.maxR||ring.t>=1){RINGS.splice(i,1);continue;}
+    ctx.globalAlpha=Math.max(0,(1-ring.t)*.8);
+    ctx.strokeStyle=ring.col;ctx.lineWidth=2+ring.t*3;
+    ctx.beginPath();ctx.arc(ring.sx,ring.sy-20,ring.r,0,Math.PI*2);ctx.stroke();
+    ctx.globalAlpha=1;ctx.lineWidth=1;
+  }
+}
+
 function spawnParticles(wx,wy,count,col,type='hit'){
   const{sx,sy}=w2s(wx,wy,tileH(wx,wy));
   for(let i=0;i<count;i++){
@@ -1006,6 +1062,11 @@ function updateCamera(){
 }
 
 function render(now){
+  // Update screen shake
+  if(shakeDur>0){
+    shakeX=(Math.random()-.5)*shakeAmt;shakeY=(Math.random()-.5)*shakeAmt;
+    shakeDur-=16;
+  }else{shakeX=0;shakeY=0;}
   ctx.clearRect(0,0,CW,CH);
   ctx.fillStyle='#03030a';ctx.fillRect(0,0,CW,CH);
 
@@ -1066,7 +1127,8 @@ function render(now){
     ctx.fillText(`⚠ BOSS`,CW/2,by-7);
   }
 
-  // Particles
+  // Rings, particles, floats
+  drawRings();
   for(let i=FLOATS.length-1;i>=0;i--){
     const f=FLOATS[i];f.t+=.04;
     ctx.globalAlpha=Math.max(0,1-f.t);
@@ -1092,11 +1154,42 @@ function drawDayNight(now){
   const dov=document.getElementById('dn-ov');
   const dc=dov.getContext('2d');
   dc.clearRect(0,0,CW,CH);
-  dayTime=(Math.sin(now*.00002)+1)/2; // 0=night, 1=day (very slow cycle)
+  dayTime=(Math.sin(now*.00002)+1)/2;
   if(dayTime<.4){
     const alpha=(1-dayTime/.4)*.55;
     dc.fillStyle=`rgba(0,5,30,${alpha})`;
     dc.fillRect(0,0,CW,CH);
+  }
+  // Ambient biome overlay
+  const cb=BM[Math.max(0,Math.min(W-1,Math.floor(P.wy)))]?.[Math.max(0,Math.min(W-1,Math.floor(P.wx)))]??3;
+  if(cb===BIOME.CF){
+    // Crimson forest: red mote particles
+    dc.fillStyle='rgba(180,20,40,.12)';dc.fillRect(0,0,CW,CH);
+    for(let i=0;i<8;i++){
+      const x=((now*.02*Math.sin(i*1.7)+i*137.5)%CW+CW)%CW;
+      const y=((now*.015*Math.cos(i*2.1)+i*89)%CH+CH)%CH;
+      const alpha=0.2+0.2*Math.sin(now*.003+i);
+      dc.fillStyle=`rgba(220,30,50,${alpha})`;
+      dc.beginPath();dc.arc(x,y,2+Math.sin(now*.004+i)*1,0,Math.PI*2);dc.fill();
+    }
+  }
+  if(cb===BIOME.DG){
+    // Dungeon: vignette + drifting ash
+    const vg=dc.createRadialGradient(CW/2,CH/2,CH*.28,CW/2,CH/2,CW*.68);
+    vg.addColorStop(0,'transparent');vg.addColorStop(1,'rgba(0,0,0,.48)');
+    dc.fillStyle=vg;dc.fillRect(0,0,CW,CH);
+    // Torch sparks
+    for(let i=0;i<5;i++){
+      const t=(now*.001+i*.7)%1;
+      const x=CW*.3+i*(CW*.1);
+      const y=CH*.6-t*30;
+      const alpha=Math.max(0,.6-t);
+      dc.fillStyle=`rgba(255,180,40,${alpha})`;
+      dc.beginPath();dc.arc(x,y,1.5,0,Math.PI*2);dc.fill();
+    }
+  }
+  if(cb===BIOME.VO){
+    dc.fillStyle='rgba(40,5,0,.15)';dc.fillRect(0,0,CW,CH);
   }
 }
 
@@ -1238,9 +1331,17 @@ function doAtk(m,mult,ignDef,now,partType='hit'){
   const dmg=Math.max(1,Math.round((isCrit?raw*2:raw)*mult));
   m.hp-=dmg;m.animHit=8;
   const col=isCrit?'#fd0':'#f88';
-  spawnParticles(m.wx,m.wy,isCrit?8:4,col,isCrit?'crit':'hit');
+  spawnParticles(m.wx,m.wy,isCrit?10:5,col,isCrit?'crit':'hit');
   spawnFloat(m.wx,m.wy,`-${dmg}${isCrit?' CRIT!':''}`,col);
   log(`Hit ${m.name} for ${dmg}${isCrit?' CRIT!':''}`,isCrit?'c-crit':'c-hit');
+  if(isCrit){shakeDur=200;shakeAmt=5;}
+  if(m.boss&&m.hp<m.maxHp*.5&&!m.phase2){
+    m.phase2=true;m.atk=Math.round(m.atk*1.4);
+    log(`⚠ ${m.name} ENRAGES! Attack doubled!`,'c-dead');
+    notify(`💢 ${m.name} ENRAGES!\nPhase 2: ${m.atk} ATK`);
+    shakeDur=600;shakeAmt=10;
+    spawnParticles(m.wx,m.wy,25,'#f040f0','crit');
+  }
   if(m.hp<=0){m.alive=false;onKill(m);}
 }
 
@@ -1251,7 +1352,13 @@ function onKill(m){
   spawnFloat(m.wx,m.wy,`+${m.xp}XP`,'#d4a017');
   log(`${m.name} slain! +${m.xp}XP +${m.gold}💰`,'c-dead');
   // Boss notification
-  if(m.boss)notify(`👑 BOSS DEFEATED!\n${m.name} has fallen!\n+${m.xp}XP +${m.gold}💰`);
+  if(m.boss){
+    notify(`👑 BOSS DEFEATED!\n${m.name} has fallen!\n+${m.xp}XP +${m.gold}💰`);
+    spawnRing(m.wx,m.wy,'#d4a017',80,4);spawnRing(m.wx,m.wy,'#c040c0',60,3);
+    shakeDur=800;shakeAmt=12;
+  }else{
+    spawnRing(m.wx,m.wy,'#888',30,2.5);
+  }
   // Item drops
   rollDrops(m.type,m.wx,m.wy);
   checkQuestKill(m.type);checkLevel();
@@ -1275,7 +1382,10 @@ function checkLevel(){
     P.xp-=P.xpNext;P.level++;P.xpNext=Math.round(P.level*115);
     P.maxHp+=18;P.hp=P.maxHp;P.maxMp+=10;P.mp=P.maxMp;
     P.atk+=4;P.def+=2;P.crit=Math.min(.55,P.crit+.015);P.skillPts++;
-    spawnParticles(P.wx,P.wy,20,'#d4a017','exp');
+    spawnParticles(P.wx,P.wy,25,'#d4a017','exp');
+    spawnRing(P.wx,P.wy,'#d4a017',70,3.5);
+    spawnRing(P.wx,P.wy,'#ffffff',45,2.5);
+    shakeDur=300;shakeAmt=6;
     log(`LEVEL UP! Now level ${P.level}. +1 Skill Point!`,'c-xp');
     notify(`⬆️ Level ${P.level}!\n+18HP  +4ATK  +2DEF\n✨ +1 Skill Point`);
   }
@@ -1289,10 +1399,18 @@ function useSkill(slot,now){
   if(!target&&!sk.invul&&!sk.mc){log('No target!','');return;}
   P.mp-=sk.mp||0;
   if(sk.mult&&sk.mult>0&&target&&target.alive){
-    spawnParticles(target.wx,target.wy,15,P.cls==='mage'?'#6080f0':P.cls==='rogue'?'#50c060':'#c08040','crit');
+    // Spell-specific particle colours
+    const spellCol=sk.id==='fireball'?'#ff6020':sk.id==='burst'?'#6080ff':
+      sk.id==='nova'?'#40c8ff':sk.id==='backstab'?'#50e060':
+      sk.id==='berserk'?'#ff3010':'#d4a017';
+    spawnParticles(target.wx,target.wy,18,spellCol,'crit');
+    spawnRing(target.wx,target.wy,spellCol,50,3);
     doAtk(target,sk.mult,sk.ignDef||false,now,'skill');
   }
-  if(sk.stun&&target)target.stunUntil=now+(sk.stun||0);
+  if(sk.stun&&target){
+    target.stunUntil=now+(sk.stun||0);
+    spawnRing(target.wx,target.wy,sk.id==='nova'?'#40c8ff':'#8080ff',40,2.5);
+  }
   if(sk.invul)P.invulUntil=now+(sk.invul||0);
   if(sk.mc&&target)target.missCount=(sk.mc||0);
   if(sk.hp&&sk.hp>0)P.hp=Math.max(1,Math.round(P.hp-P.maxHp*sk.hp));
@@ -1512,7 +1630,14 @@ function toggleQPanel(){
 function updateQPanel(){
   const el=document.getElementById('ql');el.innerHTML='';
   const qs=Object.values(quests);
-  if(!qs.length){el.innerHTML='<div style="color:#333;font-size:.7rem">Talk to NPCs (! icon) for quests.</div>';return;}
+  if(!qs.length){
+    el.innerHTML='<div style="color:#333;font-size:.7rem">Talk to NPCs (! icon) for quests.</div>';
+    // Show server biomes hint if connected
+    if(serverBiomes.length){
+      el.innerHTML+='<div style="color:#2a4a2a;font-size:.6rem;margin-top:6px">🔗 Server: '+serverBiomes.slice(0,4).join(', ')+'…</div>';
+    }
+    return;
+  }
   for(const q of qs){
     const d=document.createElement('div');d.className='qitem';
     d.innerHTML=`<div class="qtitle">${q.stage.icon} ${q.stage.title}</div>

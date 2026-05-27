@@ -12,6 +12,17 @@ const cpu = config.getNumber("cpu") || 1;
 const memory = config.get("memory") || "1Gi";
 const concurrency = config.getNumber("concurrency") || 80;
 
+// NVIDIA NIM configuration — used by bifrost-wac (nvidia-nim feature) for
+// LLM-backed asset generation and by the Synthesis AI faction brain.
+//
+// Set the API key with:
+//   pulumi config set --secret container-gcp-typescript:nvidiaApiKey <key>
+//
+// Obtain a free API key at: https://build.nvidia.com/
+const nvidiaApiKey   = config.requireSecret("nvidiaApiKey");
+const nvidiaBaseUrl  = config.get("nvidiaBaseUrl") || "https://integrate.api.nvidia.com/v1";
+const nvidiaModel    = config.get("nvidiaModel")   || "meta/llama-3.3-70b-instruct";
+
 // Import the provider's configuration settings.
 const gcpConfig = new pulumi.Config("gcp");
 const location = gcpConfig.require("region");
@@ -69,6 +80,22 @@ const service = new gcp.cloudrun.Service("service", {
                     ports: [
                         {
                             containerPort,
+                        },
+                    ],
+                    // NVIDIA NIM credentials for bifrost-wac LLM generation
+                    // and Synthesis AI faction brain (nvidia-nim feature).
+                    envs: [
+                        {
+                            name:  "NVIDIA_API_KEY",
+                            value: nvidiaApiKey,
+                        },
+                        {
+                            name:  "NVIDIA_NIM_BASE_URL",
+                            value: nvidiaBaseUrl,
+                        },
+                        {
+                            name:  "NVIDIA_NIM_MODEL",
+                            value: nvidiaModel,
                         },
                     ],
                 }
