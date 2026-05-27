@@ -1,0 +1,37 @@
+# Standalone WASM crate — excluded from the main workspace.
+# Build with: wasm-pack build --target web --out-dir ../../app/pkg/admin
+[workspace]
+
+[package]
+name        = "bifrost-admin"
+description = "Admin dashboard — Rust/WASM SPA for world, NPC, quest and loot authoring"
+version     = "0.1.0"
+edition     = "2021"
+authors     = ["bKG Contributors"]
+
+# WASM library target — built with wasm-pack, not cargo build.
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# UI framework
+yew = { version = "0.21", features = ["csr"] }
+
+# HTTP client for /admin-api calls
+gloo-net     = "0.6"
+gloo-console = "0.3"
+
+# WASM glue
+wasm-bindgen         = "0.2"
+wasm-bindgen-futures = "0.4"
+
+# DOM types for input event handling
+web-sys = { version = "0.3", features = [
+    "HtmlInputElement",
+    "HtmlTextAreaElement",
+    "HtmlSelectElement",
+] }
+
+# Data
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
