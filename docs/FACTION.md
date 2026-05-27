@@ -1,268 +1,141 @@
-Das ist der Punkt, wo dein MMO von „World sim“ zu **konkurrierender Realitäts-Ökonomie** kippt.
+# bKG — Synthesis AI Civilization
 
-Du baust keine NPC-Fraktion mehr. Du baust eine **KI-Spielerzivilisation**, die dieselben Regeln benutzt wie echte Spieler.
+> Not NPCs. A **distributed strategic civilization** competing against human players using the same rules.
 
 ---
 
-# 🧠 SYSTEM: DUAL-FACTION MMO CORE
+## 1. The Symmetry Guarantee
 
-```text id="core0"
-FACTION A: HUMANS (PLAYERS)
-FACTION B: SYNTHESIS (AI CIVILIZATION)
-WORLD: SHARED + CONTESTED ZONES
+Synthesis agents emit world-manipulation intents in the **same format as human players**:
+
+```
+SynthesisTick → FactionIntent → WAC Blueprint → validate() → compile() → World
 ```
 
-Beide Seiten:
-
-* sammeln Ressourcen
-* bauen Infrastruktur
-* kämpfen um Regionen
-* entwickeln Skills
-* beeinflussen Weltphysik (über WAC/BIFROST)
+No special world access. No cheating. The playing field is identical.
 
 ---
 
-# 🤖 1. KI-FRAKTION = “SYNTHESIS”
+## 2. Civilization Structure
 
-Nicht NPCs. Das ist wichtig.
+```
+1 SynthesisCore   ── global strategist (backed by NVIDIA NIM)
+N SubAI nodes     ── region controllers
+M AgentNodes      ── squad / clan level actors
+```
 
-👉 Das ist eine **verteilte strategische Zivilisation**
-
----
-
-## Struktur
-
-```rust id="ai1"
+```rust
 pub struct AiFaction {
-    pub id: String,
-    pub economy: EconomyGraph,
-    pub territory: Vec<ZoneId>,
-    pub agents: Vec<AgentNode>,
+    pub id:             String,
+    pub economy:        EconomyGraph,
+    pub territory:      Vec<ZoneId>,
+    pub agents:         Vec<AgentNode>,
     pub strategy_model: WorldModel,
-    pub memory: FactionMemoryGraph,
+    pub memory:         FactionMemoryGraph,
 }
 ```
 
 ---
 
-## KI spielt wie Spieler, aber skaliert anders:
+## 3. AI vs Human Asymmetry
 
-* 1 Agent = Squad/Clan-Level
-* 1 Sub-AI = Region Controller
-* 1 Core AI = global strategist
+| Dimension | Human Players | Synthesis AI |
+|---|---|---|
+| Decision style | Individual, creative, emergent | Coordinated, long-term, optimized |
+| Scale | Clan-level groups | Global state optimization |
+| Reaction speed | Fast, opportunistic | Slow, strategic |
+| Memory | Session-scoped | Persistent across runs |
+
+The AI does not play better — it plays **differently**. Human creativity and emergent coordination are the counter.
 
 ---
 
-# 🧠 2. WORLD CONTROL LOOP (KRITISCH)
+## 4. AI World Control Loop
 
-```text id="loop1"
-Tick:
-  1. Sense World (BIFROST snapshot)
-  2. Update faction strategy
-  3. Emit intents (same format as players)
-  4. Validate via IVL
-  5. Execute via WAC + world engine
+Each tick:
+
 ```
-
-👉 KI und Spieler sind **symmetrisch im System**
-
----
-
-# 🧭 3. ZONEN-SYSTEM (TERRITORIAL MMO)
-
-```rust id="zone1"
-pub struct Zone {
-    pub id: ZoneId,
-    pub owner: Option<FactionId>,
-    pub control_strength: f32,
-    pub resources: ResourceMap,
-    pub biome: BiomeId,
-}
+1. Sense world        ← BIFROST snapshot
+2. Update strategy    ← StrategyEngine::evaluate()
+3. Emit intents       ← FactionIntent per active agent
+4. [Caller] Validate  ← WAC validation layer
+5. [Caller] Execute   ← WAC compile → world mutation
 ```
 
 ---
 
-## Zonen wechseln Besitz durch:
+## 5. Zone Control Strategy
 
-* influence accumulation
-* infrastructure buildup
-* combat resolution
-* economic pressure
-
----
-
-# 🧠 4. PLAYER HUB = SKILL-REALITY SYSTEM (NEU)
-
-Das ist dein “noch nie so gesehenes System”.
-
-Nicht Skill Tree.
-
-👉 sondern:
-
-# 🧬 SKILL = WORLD MANIPULATION CAPABILITY
-
----
-
-## Beispiel Struktur
-
-```rust id="skill1"
-pub struct Skill {
-    pub id: String,
-    pub domain: SkillDomain,
-    pub world_effects: Vec<WorldRuleModifier>,
-    pub progression_vector: Vec<f32>,
-}
 ```
-
----
-
-## Skill Domains
-
-```text id="skill2"
-- TERRAIN (shape world)
-- ECONOMY (loot, trade, inflation)
-- COMBAT (physics advantage)
-- BIOME INTERACTION (environment control)
-- FACTION INFLUENCE (zone control speed)
-```
-
----
-
-# 🧠 5. PLAYER HUB = “REALITY OPERATING SYSTEM”
-
-Statt Menü:
-
-```text id="hub1"
-[ Player Hub ]
-
-REALITY PERMISSIONS:
-- Can modify terrain: LOW
-- Can influence loot tables: MEDIUM
-- Can affect biome evolution: UNLOCKED AT LEVEL 30
-```
-
----
-
-## Skills sind keine Zahlen
-
-Sie sind:
-
-👉 **Freischaltungen für Welt-Compiler-Regeln**
-
----
-
-# 🔥 6. KI vs PLAYER = ASYMMETRISCHE STRATEGIE
-
-## Spieler:
-
-* individuell
-* kreativ
-* emergent
-
-## KI-Faction:
-
-* koordiniert
-* langfristig
-* optimiert auf global state
-
----
-
-## Beispiel Konflikt
-
-```text id="conf1"
 Player builds fortress in zone A
 
 AI detects:
-- resource concentration shift
-→ sends 3 agents
-→ changes biome humidity
-→ destabilizes supply chain
+  → resource concentration shift
+  → sends 3 agents to adjacent zones
+  → modifies biome humidity
+  → destabilizes supply chain
 ```
 
-👉 keine “NPC attack”, sondern **Systemkrieg**
+This is **system war**, not NPC attack. The AI manipulates the physics of the economy and terrain.
 
 ---
 
-# 🧠 7. WAC INTEGRATION (KRITISCH)
+## 6. AI Behavior in Safe City
 
-KI darf nicht cheaten.
+Synthesis agents participate in the Safe City economy:
 
-Beide Seiten benutzen:
+- Buy and sell on the Auction House
+- Manipulate supply to shift prices
+- Invest influence in zones
+- Monitor player crafting patterns
 
-```text id="wac1"
-Intent → Validation → Compilation → World
+---
+
+## 7. Memory Across Runs
+
+The AI carries knowledge between runs:
+
+```rust
+pub struct AiMetaFaction {
+    pub memory_across_runs: RunMemoryGraph,
+    pub strategy_evolution: EvolutionTree,
+}
 ```
 
----
-
-# 🧨 8. NEUES GAME DESIGN PARADIGMA
-
-Du hast jetzt:
-
-## ❌ klassisch
-
-* players vs NPCs
-
-## ✅ dein system
-
-* players vs world-scale AI civilization
+The AI **learns the meta** between worlds and generates counter-strategies.
 
 ---
 
-# ⚙️ 9. ECONOMY = SHARED SYSTEM
+## 8. Emergent Behaviors
 
-```text id="eco1"
-- loot is biome-generated
-- AI influences spawn rates
-- players influence extraction rate
-- zones rebalance dynamically
-```
+When both sides operate with full symmetry:
 
----
+**AI begins:**
+- Industrializing regions
+- Building defensive biome evolution
+- Optimizing supply chains
 
-# 🧬 10. EMERGENT FEATURE (SEHR WICHTIG)
+**Players begin:**
+- Exploiting AI patterns
+- Creating fake economy loops
+- Territorial guerilla strategies
 
-Wenn beide Seiten gleich arbeiten:
-
-👉 KI beginnt:
-
-* Regionen zu “industrialisieren”
-* defensive biome evolution zu bauen
-* supply chains zu optimieren
-
-👉 Spieler beginnen:
-
-* AI patterns zu exploitieren
-* fake economy loops zu erzeugen
-* territorial guerilla strategies
+This produces **simulated civilization competition in real time** — not scripted content.
 
 ---
 
-# 🚀 RESULT
+## 9. World Director (Meta-AI)
 
-Du bekommst kein MMO mehr.
+Above both factions sits the World Director:
 
-Du bekommst:
-
-> 🧠 **Simulierte Zivilisationskonkurrenz in Echtzeit**
-
----
-
-# 🧭 NEXT LEVEL 
-
-### 👉 “World Director AI” (Meta-KI über beide Fraktionen)
-
-* verhindert stagnation
-* erzeugt Krisen
-* balanciert evolution
-
-und 
-
-### 👉 “Faction Brain Graph”
-
-* vollständige strategische Entscheidungsengine für AI
-* inkl. memory decay + goal mutation + deception layer
+- Prevents stagnation and snowball effects
+- Generates crises when balance tips too far
+- Balances faction evolution over time
+- Feeds the run-end world generation pipeline
 
 ---
 
- auch direkt den **Code-Skeleton für Synthesis AI (Faction Brain + Tick Loop + Strategy Model)** 
+## See Also
+
+- [`docs/WORLD.md`](WORLD.md) — Run system and world design
+- [`docs/WAC.md`](WAC.md) — How both factions compile world changes

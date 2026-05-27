@@ -1,14 +1,10 @@
-# bKG Phase Roadmap
+# bKG — Bifrost MMO · Phase Roadmap
 
-> DRCF — Distributed Reality Compute Fabric
+> *bKG · best known Garbage · DRCF — Distributed Reality Compute Fabric*
 
 ---
 
-## Phase 1 — Bifrost Layer (Current)
-
-Build the deterministic bridge between DELPHOS Kernel and the MMO Fabric.
-
-### Batch 1 — Core Bifrost Crates
+## Current State (after PR #3)
 
 | Crate | Status | Description |
 |---|---|---|
@@ -16,39 +12,61 @@ Build the deterministic bridge between DELPHOS Kernel and the MMO Fabric.
 | `bifrost-chunk` | ✅ | Chunk authority epoch system |
 | `bifrost-lockstep` | ✅ | Lockstep tick scheduler |
 | `bifrost-witness` | ✅ | Witness quorum execution |
-| `bifrost-physics` | ✅ | Deterministic WASM physics kernel |
+| `bifrost-physics` | ✅ | Deterministic f64 physics kernel |
+| `bifrost-wac` | ✅ | World Asset Compiler + TileMap + NVIDIA NIM |
+| `bifrost-aigm` | ✅ | NPC AI, quest system, story engine |
+| `bifrost-run` | ✅ | World Run system, win conditions, meta progression |
+| `bifrost-synthesis` | ✅ | Synthesis AI civilization, strategy engine |
+| `bifrost-safe-city` | ✅ | Safe City, Auction House, zone control |
+| `bifrost-server` | ✅ | HTTP REST API — 40+ routes |
+| `nexus-voxel-kernel` | ✅ | Greedy meshing, NavMesh, biome generator, WAC RT |
+| `nova-core` | ✅ | ECS, Transform3D, SceneGraph, Timer |
+| `nova-render` | ✅ | WebGPU pipeline, Camera3D, WGSL shaders |
+| `nova-anim` | ✅ | VoxelSkeleton, AnimClip, AnimFSM |
+| `nova-input` | ✅ | KeyCode → ActionId, InputMap::default_mmo() |
 
-### Batch 2 — Hierarchical Simulation
+---
 
-- [ ] `bifrost-lod` — Level-of-detail simulation abstraction
-- [ ] `bifrost-combat` — Probabilistic distant combat
-- [ ] `bifrost-prediction` — Delta prediction fabric
+## Active PRs
 
-### Batch 3 — Reputation + GPU Distribution
+| PR | Title | Status |
+|---|---|---|
+| [#4](https://github.com/soniaschuh88-ship-it/mmo/pull/4) | fix(determinism): noise smoothstep + canonical biome registry | Open |
 
-- [ ] `bifrost-reputation` — Proof-of-Render trust score engine
-- [ ] `bifrost-gpu-market` — GPU task distribution market
-- [ ] `bifrost-tile-verify` — Tile witness verification + malicious detection
+---
 
-### Batch 4 — Sovereign Worlds
+## Drift Fix PRs (in order)
 
-- [ ] `bifrost-npc` — Fully distributed NPC cognition
-- [ ] `bifrost-economy` — Emergent player-driven economy
-- [ ] `bifrost-shard` — Player-hosted sovereign world shards
+These fix the three-way drift discovered in the codebase audit.
+
+| PR | Steps | Description |
+|---|---|---|
+| PR 1 (open) | 1+2 | Noise smoothstep JS=Rust + canonical biome registry |
+| PR 2 | 3+8 | Unify `BiomeIR` duplicate + `Vec3Payload → nova_core::Vec3` |
+| PR 3 | 5+6 | Quest HTTP routes + game.html API fetch (server-authoritative world data) |
+| PR 4 | 7 | Wire run-end → WorldDirector (self-evolving world loop) |
+| PR 5 | 4 | AnimationGraphIR → nova-anim FSM bridge (WAC as behavior compiler) |
 
 ---
 
 ## Phase 2 — MMO Fabric Integration
 
-- Node.js WebRTC mesh bridge
-- Browser WASM runtime deployment
-- GPU P2P distribution network
+- [ ] Browser WASM compilation of nova-core + nova-render
+- [ ] WebGPU world rendering replaces Canvas 2D
+- [ ] WebRTC peer mesh bridge (Node.js)
+- [ ] GPU P2P distribution network
 
 ## Phase 3 — DELPHOS ↔ Bifrost Protocol
 
-- Formal epoch handshake protocol
-- Ledger-backed chunk replay
-- Settlement finalization bridge
+- [ ] Formal epoch handshake protocol
+- [ ] Ledger-backed chunk replay
+- [ ] Settlement finalization bridge
+
+## Phase 4 — Advanced Bifrost
+
+- [ ] `bifrost-lod` — Level-of-detail simulation abstraction
+- [ ] `bifrost-combat` — Probabilistic distant combat
+- [ ] `bifrost-reputation` — Proof-of-Render trust score engine
 
 ---
 
@@ -59,3 +77,5 @@ Build the deterministic bridge between DELPHOS Kernel and the MMO Fabric.
 3. NPC cognition is never centralized
 4. Combat resolution is never centralized
 5. DELPHOS decides truth; players compute reality
+6. **Same seed = same world** — always, everywhere
+7. Every world concept exists **once** (`bifrost-wac` is the World Type Authority)

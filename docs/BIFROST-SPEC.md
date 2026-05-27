@@ -1,4 +1,4 @@
-# Bifrost Protocol Specification
+# bKG — Bifrost Protocol Specification
 
 > Bifrost connects DELPHOS (truth authority) to the MMO Fabric (distributed compute).
 
