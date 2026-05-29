@@ -11,7 +11,7 @@
 //!
 //! ## Key types
 //!
-//! - [`ZoneId`] — spatial simulation partition identifier
+//! - [`ShardId`] — spatial simulation partition identifier
 //! - [`LockstepTick`] — zone-local tick (zone_id + local_seq + epoch)
 //! - [`CausalOrder`] — cross-zone causal comparison result
 //! - [`TickBarrier`] — tracks per-peer acknowledgments
@@ -28,4 +28,4 @@ pub use barrier::TickBarrier;
 pub use budget::{BudgetError, EventClass, TickBudget, TickUsage, TickUsageHeadroom};
 pub use input::InputBuffer;
 pub use scheduler::{LockstepScheduler, SchedulerError, TickAdvance};
-pub use tick::{CausalOrder, LockstepTick, ZoneId};
+pub use tick::{CausalOrder, LockstepTick, ShardId};

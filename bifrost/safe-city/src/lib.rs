@@ -41,11 +41,10 @@
 pub mod auction;
 pub mod base;
 pub mod city;
-pub mod director;
 pub mod zone;
 
 pub use auction::{AuctionHouse, Listing, ListingStatus, TaxPolicy};
 pub use base::{PlayerBase, WacAssetRef};
 pub use city::{SafeCity, AllowedAction, CraftingRules, RespawnPolicy};
-pub use director::{WorldDirector, BalanceMatrix, PressureField};
-pub use zone::{Zone, ZoneId, ZoneState, ResourceMap};
+// ZoneId and FactionId are re-exported from zone (which imports from bifrost-kernel).
+pub use zone::{Zone, FactionId, ZoneId, ZoneState, ResourceMap};

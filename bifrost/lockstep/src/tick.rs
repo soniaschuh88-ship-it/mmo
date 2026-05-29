@@ -9,10 +9,10 @@
 //!
 //! # Design
 //!
-//! Each tick is scoped to a `ZoneId`:
+//! Each tick is scoped to a `ShardId`:
 //!
 //! ```text
-//! LockstepTick { zone_id: ZoneId(3), local_seq: 4412, epoch: 7 }
+//! LockstepTick { zone_id: ShardId(3), local_seq: 4412, epoch: 7 }
 //! ```
 //!
 //! - `zone_id`   — which spatial partition owns this tick
@@ -27,27 +27,31 @@
 
 use serde::{Deserialize, Serialize};
 
-// ─── ZoneId ───────────────────────────────────────────────────────────────────
+// ─── ShardId ──────────────────────────────────────────────────────────────────
 
-/// Identifies a spatial simulation partition.
+/// Identifies a spatial simulation partition (shard).
 ///
-/// Each zone runs an independent deterministic tick loop. Cross-zone events
+/// Each shard runs an independent deterministic tick loop.  Cross-shard events
 /// require causal ordering, not sequence ordering.
+///
+/// Named `ShardId` (not `ShardId`) to avoid the R1 collision with
+/// `bifrost_kernel::ShardId = String`, which is the authoritative zone
+/// identifier in the broader game world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord,
          Serialize, Deserialize, Default)]
-pub struct ZoneId(pub u32);
+pub struct ShardId(pub u32);
 
-impl ZoneId {
-    /// The "global" zone — used before zone partitioning is established,
-    /// and for single-zone deployments.
+impl ShardId {
+    /// The "global" shard — used before zone partitioning is established,
+    /// and for single-shard deployments.
     pub const GLOBAL: Self = Self(0);
 
     pub fn new(id: u32) -> Self { Self(id) }
 }
 
-impl std::fmt::Display for ZoneId {
+impl std::fmt::Display for ShardId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "zone({})", self.0)
+        write!(f, "shard({})", self.0)
     }
 }
 
@@ -81,7 +85,7 @@ pub enum CausalOrder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LockstepTick {
     /// The zone this tick belongs to.
-    pub zone_id:   ZoneId,
+    pub zone_id:   ShardId,
     /// Monotonically increasing within the zone — the primary simulation clock.
     pub local_seq: u64,
     /// Global epoch, set by DELPHOS. Audit/reconciliation only.
@@ -94,16 +98,16 @@ impl LockstepTick {
 
     /// Tick 0 in the global zone (backward-compatible default).
     pub fn zero() -> Self {
-        Self { zone_id: ZoneId::GLOBAL, local_seq: 0, epoch: 0 }
+        Self { zone_id: ShardId::GLOBAL, local_seq: 0, epoch: 0 }
     }
 
     /// First tick for a specific zone at the given epoch.
-    pub fn zone_start(zone_id: ZoneId, epoch: u64) -> Self {
+    pub fn zone_start(zone_id: ShardId, epoch: u64) -> Self {
         Self { zone_id, local_seq: 0, epoch }
     }
 
     /// Build a tick at an explicit position (used in tests and snapshots).
-    pub fn at(zone_id: ZoneId, local_seq: u64, epoch: u64) -> Self {
+    pub fn at(zone_id: ShardId, local_seq: u64, epoch: u64) -> Self {
         Self { zone_id, local_seq, epoch }
     }
 
@@ -111,7 +115,7 @@ impl LockstepTick {
     ///
     /// Used for API backward compat. New code should use `zone_start` / `at`.
     pub fn from_legacy(seq: u64) -> Self {
-        Self { zone_id: ZoneId::GLOBAL, local_seq: seq, epoch: seq }
+        Self { zone_id: ShardId::GLOBAL, local_seq: seq, epoch: seq }
     }
 
     // ── Advancement ───────────────────────────────────────────────────────────
@@ -124,7 +128,7 @@ impl LockstepTick {
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    pub fn zone_id(self)   -> ZoneId { self.zone_id }
+    pub fn zone_id(self)   -> ShardId { self.zone_id }
     pub fn local_seq(self) -> u64    { self.local_seq }
     pub fn epoch(self)     -> u64    { self.epoch }
 
@@ -228,23 +232,23 @@ mod tests {
     #[test]
     fn zero_is_global_seq_zero() {
         let t = LockstepTick::zero();
-        assert_eq!(t.zone_id(), ZoneId::GLOBAL);
+        assert_eq!(t.zone_id(), ShardId::GLOBAL);
         assert_eq!(t.local_seq(), 0);
     }
 
     #[test]
     fn next_increments_local_seq_only() {
-        let t = LockstepTick::at(ZoneId::new(2), 41, 7);
+        let t = LockstepTick::at(ShardId::new(2), 41, 7);
         let n = t.next();
         assert_eq!(n.local_seq(), 42);
-        assert_eq!(n.zone_id(),   ZoneId::new(2));
+        assert_eq!(n.zone_id(),   ShardId::new(2));
         assert_eq!(n.epoch(),     7); // epoch unchanged by tick loop
     }
 
     #[test]
     fn same_zone_ordering() {
-        let a = LockstepTick::at(ZoneId::new(1), 5, 0);
-        let b = LockstepTick::at(ZoneId::new(1), 9, 0);
+        let a = LockstepTick::at(ShardId::new(1), 5, 0);
+        let b = LockstepTick::at(ShardId::new(1), 9, 0);
         assert!(a < b);
         assert_eq!(a.causal_cmp(b), CausalOrder::Before);
         assert_eq!(b.causal_cmp(a), CausalOrder::After);
@@ -252,8 +256,8 @@ mod tests {
 
     #[test]
     fn cross_zone_is_concurrent() {
-        let a = LockstepTick::at(ZoneId::new(1), 100, 0);
-        let b = LockstepTick::at(ZoneId::new(2), 1,   0);
+        let a = LockstepTick::at(ShardId::new(1), 100, 0);
+        let b = LockstepTick::at(ShardId::new(2), 1,   0);
         // a has higher local_seq but different zone — cannot compare causally
         assert_eq!(a.causal_cmp(b), CausalOrder::Concurrent);
         // Ord sorts by zone_id first
@@ -264,26 +268,26 @@ mod tests {
     fn btreemap_groups_by_zone() {
         use std::collections::BTreeMap;
         let mut m: BTreeMap<LockstepTick, &str> = BTreeMap::new();
-        m.insert(LockstepTick::at(ZoneId::new(2), 0, 0), "z2-t0");
-        m.insert(LockstepTick::at(ZoneId::new(1), 0, 0), "z1-t0");
-        m.insert(LockstepTick::at(ZoneId::new(1), 1, 0), "z1-t1");
+        m.insert(LockstepTick::at(ShardId::new(2), 0, 0), "z2-t0");
+        m.insert(LockstepTick::at(ShardId::new(1), 0, 0), "z1-t0");
+        m.insert(LockstepTick::at(ShardId::new(1), 1, 0), "z1-t1");
         // Zone 1 entries come before Zone 2
         let keys: Vec<_> = m.keys().collect();
-        assert_eq!(keys[0].zone_id(), ZoneId::new(1));
-        assert_eq!(keys[1].zone_id(), ZoneId::new(1));
-        assert_eq!(keys[2].zone_id(), ZoneId::new(2));
+        assert_eq!(keys[0].zone_id(), ShardId::new(1));
+        assert_eq!(keys[1].zone_id(), ShardId::new(1));
+        assert_eq!(keys[2].zone_id(), ShardId::new(2));
     }
 
     #[test]
     fn is_lagging_same_zone() {
-        let current = LockstepTick::at(ZoneId::GLOBAL, 100, 0);
-        assert!(LockstepTick::at(ZoneId::GLOBAL, 90, 0).is_lagging(current, 5));
-        assert!(!LockstepTick::at(ZoneId::GLOBAL, 97, 0).is_lagging(current, 5));
+        let current = LockstepTick::at(ShardId::GLOBAL, 100, 0);
+        assert!(LockstepTick::at(ShardId::GLOBAL, 90, 0).is_lagging(current, 5));
+        assert!(!LockstepTick::at(ShardId::GLOBAL, 97, 0).is_lagging(current, 5));
     }
 
     #[test]
     fn canonical_bytes_stable() {
-        let t = LockstepTick::at(ZoneId::new(3), 1000, 42);
+        let t = LockstepTick::at(ShardId::new(3), 1000, 42);
         let b = t.canonical_bytes();
         // zone_id = 3
         assert_eq!(u32::from_le_bytes(b[0..4].try_into().unwrap()), 3);
@@ -294,7 +298,7 @@ mod tests {
     #[test]
     fn from_legacy_global_zone() {
         let t = LockstepTick::from_legacy(77);
-        assert_eq!(t.zone_id(),   ZoneId::GLOBAL);
+        assert_eq!(t.zone_id(),   ShardId::GLOBAL);
         assert_eq!(t.local_seq(), 77);
     }
 }

@@ -104,10 +104,10 @@ mod tests {
 
     #[test]
     fn different_zone_different_hash() {
-        use bifrost_lockstep::ZoneId;
+        use bifrost_lockstep::ShardId;
         let h = TickHash::from_bytes([1u8; 32]);
-        let t1 = LockstepTick::at(ZoneId::new(1), 5, 0);
-        let t2 = LockstepTick::at(ZoneId::new(2), 5, 0);
+        let t1 = LockstepTick::at(ShardId::new(1), 5, 0);
+        let t2 = LockstepTick::at(ShardId::new(2), 5, 0);
         let v1 = WitnessVote::unsigned(peer(1), t1, h, PeerRole::Witness);
         let v2 = WitnessVote::unsigned(peer(1), t2, h, PeerRole::Witness);
         // Same local_seq, same hash, but different zone → different payload hash

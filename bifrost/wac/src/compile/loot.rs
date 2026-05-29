@@ -5,6 +5,7 @@ use rand::rngs::StdRng;
 
 use crate::types::*;
 use crate::validate::WacError;
+use super::{has, title_case};
 
 /// Rarity keywords → base drop rate ranges.
 const RARE_KEYS:   &[&str] = &["rare","selten","very rare","ultra","legendary"];
@@ -84,7 +85,7 @@ pub fn compile(bp: &crate::types::AssetBlueprint) -> Result<LootTableIR, WacErro
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-fn has(spec: &str, keys: &[&str]) -> bool { keys.iter().any(|k| spec.contains(k)) }
+// `has` and `title_case` are imported from `compile/mod.rs`.
 
 fn extract_item_id(spec: &str) -> String {
     // Look for common item nouns
@@ -127,12 +128,7 @@ fn sanitize(spec: &str, words: usize) -> String {
         .collect::<Vec<_>>().join("_")
 }
 
-fn title_case(s: &str) -> String {
-    s.split('_').map(|w| {
-        let mut c = w.chars();
-        match c.next() { None => String::new(), Some(f) => f.to_uppercase().to_string() + c.as_str() }
-    }).collect::<Vec<_>>().join(" ")
-}
+// `title_case` is imported from `compile/mod.rs`.
 
 #[cfg(test)]
 mod tests {

@@ -91,7 +91,7 @@ impl TickBarrier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tick::ZoneId;
+    use crate::tick::ShardId;
 
     fn t(seq: u64) -> LockstepTick { LockstepTick::from_legacy(seq) }
     fn p(seed: u8) -> PeerId       { PeerId([seed; 32]) }
@@ -149,7 +149,7 @@ mod tests {
         let peer = p(1);
         b.register(peer);
         // Zone 3, seq 99
-        let tick = LockstepTick::at(ZoneId::new(3), 99, 0);
+        let tick = LockstepTick::at(ShardId::new(3), 99, 0);
         b.ack(peer, tick);
         assert!(b.can_advance(tick));
     }

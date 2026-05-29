@@ -49,4 +49,5 @@ pub mod run;
 pub use director::WorldRunDirector;
 pub use end_condition::{EndCondition, EndConditionEval};
 pub use meta::{MetaProgression, MetaUnlock, RunReward, SkillDecay};
-pub use run::{WorldRun, RunState, RunResult, FactionId, RunId};
+// FactionId is canonical in bifrost_kernel — import from there directly.
+pub use run::{WorldRun, RunState, RunResult, RunId};

@@ -335,7 +335,7 @@ pub const DIALOGUE_QUEUE_CAPACITY: usize = 64;
 /// Per-zone queue of pending LLM calls, ordered by priority then enqueue time.
 ///
 /// The AI GM drains up to `max_npc_dialogues` entries per tick (see
-/// [`crate::aigm::TickBudget`]).
+/// [`crate::aigm::AiGmBudget`]).
 #[derive(Debug, Clone, Default)]
 pub struct DialogueQueue {
     items: Vec<PendingDialogue>,

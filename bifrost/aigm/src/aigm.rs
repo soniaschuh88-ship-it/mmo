@@ -40,7 +40,7 @@ use crate::npc::registry::{NpcRegistry, NpcTickInput};
 use crate::quest::QuestRegistry;
 use crate::story::StoryEngine;
 
-// ─── TickBudget ───────────────────────────────────────────────────────────────
+// ─── AiGmBudget ───────────────────────────────────────────────────────────────
 
 /// Hard per-tick event caps.  Enforced by [`AiGmState::tick`] to prevent
 /// runaway event storms from flooding the ledger.
@@ -54,7 +54,7 @@ use crate::story::StoryEngine;
 /// | `max_story_beats`  |   1     |
 /// | `max_npc_dialogues`|  10     |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TickBudget {
+pub struct AiGmBudget {
     /// Maximum AI-authored events emitted to the ledger per tick.
     pub max_ai_events: u32,
     /// Maximum `AigmQuestCreate` events per tick.
@@ -65,7 +65,7 @@ pub struct TickBudget {
     pub max_npc_dialogues: u32,
 }
 
-impl Default for TickBudget {
+impl Default for AiGmBudget {
     fn default() -> Self {
         Self {
             max_ai_events:      50,
@@ -76,11 +76,11 @@ impl Default for TickBudget {
     }
 }
 
-// ─── BudgetUsage ─────────────────────────────────────────────────────────────
+// ─── AiGmBudgetUsage ─────────────────────────────────────────────────────────────
 
-/// How much of each [`TickBudget`] slot was consumed in one tick.
+/// How much of each [`AiGmBudget`] slot was consumed in one tick.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct BudgetUsage {
+pub struct AiGmBudgetUsage {
     pub ai_events: u32,
     pub quest_creates: u32,
     pub story_beats: u32,
@@ -102,11 +102,11 @@ pub struct AiGmTick {
     pub events_out: Vec<WorldEvent>,
     /// Layer 2 NPC dialogue requests ready for LLM dispatch.
     ///
-    /// Already filtered by [`TickBudget::max_npc_dialogues`] and the NPC's
+    /// Already filtered by [`AiGmBudget::max_npc_dialogues`] and the NPC's
     /// per-NPC cooldown ([`AiContext::can_speak`]).
     pub pending_dialogues: Vec<PendingDialogue>,
     /// Breakdown of budget consumed.
-    pub budget_used: BudgetUsage,
+    pub budget_used: AiGmBudgetUsage,
 }
 
 // ─── AiGmError ───────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ const MAX_RECENT_EVENTS: usize = 200;
 /// let result = gm.tick(
 ///     &incoming_events,
 ///     &npc_input,
-///     TickBudget::default(),
+///     AiGmBudget::default(),
 ///     now_ms,
 ///     current_tick,
 /// );
@@ -292,11 +292,11 @@ impl AiGmState {
         &mut self,
         incoming_events: &[WorldEvent],
         npc_input: &NpcTickInput<'_>,
-        budget: TickBudget,
+        budget: AiGmBudget,
         now_ms: u64,
         current_tick: u64,
     ) -> AiGmTick {
-        let mut usage = BudgetUsage::default();
+        let mut usage = AiGmBudgetUsage::default();
         let mut events_out: Vec<WorldEvent> = Vec::new();
 
         // Step 1: ingest.
@@ -395,7 +395,7 @@ mod tests {
     fn tick_with_no_npcs_produces_no_dialogues() {
         let mut gm = AiGmState::new("w", "m");
         let input = NpcTickInput::default();
-        let result = gm.tick(&[], &input, TickBudget::default(), 0, 1);
+        let result = gm.tick(&[], &input, AiGmBudget::default(), 0, 1);
         assert!(result.pending_dialogues.is_empty());
     }
 
@@ -407,7 +407,7 @@ mod tests {
         let mut input = NpcTickInput::default();
         input.speaking_to.insert("aldric", ("player-1", "What news?"));
 
-        let result = gm.tick(&[], &input, TickBudget::default(), 0, 1);
+        let result = gm.tick(&[], &input, AiGmBudget::default(), 0, 1);
         assert_eq!(result.pending_dialogues.len(), 1);
         assert_eq!(result.pending_dialogues[0].npc_id, "aldric");
     }
@@ -427,7 +427,7 @@ mod tests {
             );
         }
 
-        let budget = TickBudget { max_npc_dialogues: 2, ..Default::default() };
+        let budget = AiGmBudget { max_npc_dialogues: 2, ..Default::default() };
         let result = gm.tick(&[], &input, budget, 0, 1);
         assert!(result.budget_used.npc_dialogues <= 2);
         assert!(result.pending_dialogues.len() <= 2);
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn tick_budget_default_values() {
-        let b = TickBudget::default();
+        let b = AiGmBudget::default();
         assert_eq!(b.max_ai_events,     50);
         assert_eq!(b.max_quest_creates,  3);
         assert_eq!(b.max_story_beats,    1);

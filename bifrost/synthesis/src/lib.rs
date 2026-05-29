@@ -55,8 +55,9 @@ pub mod strategy;
 pub mod tick;
 
 pub use agent::{AgentNode, AgentRole, AgentState};
-pub use faction::{AiFaction, AiMetaFaction, FactionId, ZoneId};
+// FactionId and ZoneId are canonical in bifrost_kernel — import from there.
+pub use faction::{AiFaction, AiMetaFaction};
 pub use intent::{FactionIntent, IntentType, IntentPriority};
-pub use memory::{FactionMemory, MemoryEntry, RunMemoryGraph};
+pub use memory::{FactionMemory, FactionMemoryEntry, RunMemoryGraph};
 pub use strategy::{WorldModel, StrategyEngine, StrategyGoal};
 pub use tick::{SynthesisTick, TickOutput};

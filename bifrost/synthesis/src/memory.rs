@@ -14,7 +14,7 @@ use crate::faction::{ZoneId, RunSummary};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FactionMemory {
     /// All observed events this run.
-    pub entries: Vec<MemoryEntry>,
+    pub entries: Vec<FactionMemoryEntry>,
 
     /// Maximum number of entries before oldest are evicted.
     pub capacity: usize,
@@ -28,7 +28,7 @@ impl FactionMemory {
     /// Record a new memory entry.
     ///
     /// Evicts the oldest entry if capacity is reached (FIFO ring buffer).
-    pub fn record(&mut self, entry: MemoryEntry) {
+    pub fn record(&mut self, entry: FactionMemoryEntry) {
         if self.capacity > 0 && self.entries.len() >= self.capacity {
             self.entries.remove(0);
         }
@@ -36,7 +36,7 @@ impl FactionMemory {
     }
 
     /// Return entries matching a specific event type.
-    pub fn filter(&self, event_type: MemoryEventType) -> Vec<&MemoryEntry> {
+    pub fn filter(&self, event_type: MemoryEventType) -> Vec<&FactionMemoryEntry> {
         self.entries.iter().filter(|e| e.event_type == event_type).collect()
     }
 
@@ -50,11 +50,11 @@ impl FactionMemory {
     }
 }
 
-// ─── MemoryEntry ─────────────────────────────────────────────────────────────
+// ─── FactionMemoryEntry ─────────────────────────────────────────────────────────────
 
 /// A single entry in the faction's in-run memory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryEntry {
+pub struct FactionMemoryEntry {
     pub id:          Uuid,
     pub tick:        u64,
     pub event_type:  MemoryEventType,
@@ -64,7 +64,7 @@ pub struct MemoryEntry {
     pub importance:  f32,
 }
 
-impl MemoryEntry {
+impl FactionMemoryEntry {
     pub fn new(
         tick:        u64,
         event_type:  MemoryEventType,
@@ -148,7 +148,7 @@ mod tests {
     fn memory_evicts_at_capacity() {
         let mut mem = FactionMemory::new(2);
         for i in 0..3u64 {
-            mem.record(MemoryEntry::new(i, MemoryEventType::ZoneCaptured, None, "test", 1.0));
+            mem.record(FactionMemoryEntry::new(i, MemoryEventType::ZoneCaptured, None, "test", 1.0));
         }
         assert_eq!(mem.entries.len(), 2);
         assert_eq!(mem.entries[0].tick, 1); // oldest (tick=0) evicted
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn memory_decay_removes_below_threshold() {
         let mut mem = FactionMemory::new(100);
-        mem.record(MemoryEntry::new(0, MemoryEventType::EconomyAnomaly, None, "test", 0.01));
+        mem.record(FactionMemoryEntry::new(0, MemoryEventType::EconomyAnomaly, None, "test", 0.01));
         mem.decay(0.1); // threshold above 0.01 * 0.95
         assert!(mem.entries.is_empty());
     }

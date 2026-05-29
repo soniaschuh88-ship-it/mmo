@@ -1,4 +1,4 @@
-//! Vec3 — deterministic f64 3D vector.
+//! PhysicsVec3 — deterministic f64 3D vector.
 //!
 //! # Determinism contract
 //!
@@ -17,13 +17,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// Used for voxel velocities and physics forces. Positions use `(i32, i32, i32)` keys.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
-pub struct Vec3 {
+pub struct PhysicsVec3 {
     pub x: f64,
     pub y: f64,
     pub z: f64,
 }
 
-impl Vec3 {
+impl PhysicsVec3 {
     pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
 
     #[inline]
@@ -66,14 +66,14 @@ impl Vec3 {
     }
 }
 
-impl std::ops::Add for Vec3 {
+impl std::ops::Add for PhysicsVec3 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
     }
 }
 
-impl std::ops::Mul<f64> for Vec3 {
+impl std::ops::Mul<f64> for PhysicsVec3 {
     type Output = Self;
     fn mul(self, s: f64) -> Self {
         Self::new(self.x * s, self.y * s, self.z * s)
@@ -87,18 +87,18 @@ mod tests {
     #[test]
     fn int_dist_sq_correct() {
         // 3-4-5 right triangle: dist_sq = 25
-        assert_eq!(Vec3::int_dist_sq(0, 0, 0, 3, 4, 0), 25);
+        assert_eq!(PhysicsVec3::int_dist_sq(0, 0, 0, 3, 4, 0), 25);
     }
 
     #[test]
     fn canonical_bytes_deterministic() {
-        let v = Vec3::new(1.5, -2.0, 0.0);
+        let v = PhysicsVec3::new(1.5, -2.0, 0.0);
         assert_eq!(v.canonical_bytes(), v.canonical_bytes());
     }
 
     #[test]
     fn zero_detection() {
-        assert!(Vec3::ZERO.is_zero());
-        assert!(!Vec3::new(0.0, 0.0, 1.0).is_zero());
+        assert!(PhysicsVec3::ZERO.is_zero());
+        assert!(!PhysicsVec3::new(0.0, 0.0, 1.0).is_zero());
     }
 }

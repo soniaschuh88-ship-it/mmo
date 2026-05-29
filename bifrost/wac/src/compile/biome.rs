@@ -5,6 +5,7 @@ use rand::rngs::StdRng;
 
 use crate::types::*;
 use crate::validate::WacError;
+use super::{has, make_id, title_case};
 
 /// Keyword sets for terrain classification.
 #[allow(dead_code)]
@@ -119,10 +120,7 @@ pub fn compile(bp: &crate::types::AssetBlueprint) -> Result<BiomeIR, WacError> {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-fn has(spec: &str, keys: &[&str]) -> bool {
-    keys.iter().any(|k| spec.contains(k))
-}
+// `has`, `make_id`, `title_case` are shared helpers from `compile/mod.rs`.
 
 /// Apply a uniform jitter of ±`range` around `base` using seeded RNG.
 fn jitter(rng: &mut StdRng, base: f32, range: f32) -> f32 {
@@ -151,31 +149,7 @@ fn derive_entity_id(spec: &str, _terrain: impl Copy) -> String {
     }.into()
 }
 
-/// Build a url-safe id from the first 3 meaningful words of the spec.
-fn make_id(spec: &str) -> String {
-    let stop_words = ["mit","und","die","der","das","the","a","an","and","or","of",
-                      "in","with","that","are","is","from","at","by"];
-    spec.split_whitespace()
-        .filter(|w| !stop_words.contains(&w.as_ref()))
-        .take(3)
-        .map(|w| w.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase())
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
-
-fn title_case(s: &str) -> String {
-    s.split_whitespace()
-        .map(|w| {
-            let mut c = w.chars();
-            match c.next() {
-                None    => String::new(),
-                Some(f) => f.to_uppercase().to_string() + c.as_str(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
+// `make_id` and `title_case` are imported from `compile/mod.rs` (see `use super::{…}`).
 
 #[cfg(test)]
 mod tests {

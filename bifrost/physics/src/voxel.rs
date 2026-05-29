@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::material::MAT_AIR;
-use crate::vec3::Vec3;
+use crate::vec3::PhysicsVec3;
 
 /// World-space key for a voxel position.
 ///
@@ -26,7 +26,7 @@ pub struct VoxelState {
     /// Remaining durability (0 = destroyed, becomes air on next tick).
     pub durability: u16,
     /// Current velocity (for debris/projectile voxels).
-    pub velocity:   Vec3,
+    pub velocity:   PhysicsVec3,
     /// Bitflags: `ON_FIRE`, `FLOODED`, etc.
     pub flags:      u8,
 }
@@ -38,14 +38,14 @@ impl VoxelState {
         Self {
             material,
             durability: base_durability,
-            velocity:   Vec3::ZERO,
+            velocity:   PhysicsVec3::ZERO,
             flags:      0,
         }
     }
 
     /// Air (empty space).
     pub fn air() -> Self {
-        Self { material: MAT_AIR, durability: 0, velocity: Vec3::ZERO, flags: 0 }
+        Self { material: MAT_AIR, durability: 0, velocity: PhysicsVec3::ZERO, flags: 0 }
     }
 
     /// True if this is air / empty.

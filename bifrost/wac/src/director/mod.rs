@@ -75,6 +75,23 @@ pub struct DirectorState {
     pub last_narrative_event: u64,
     /// Total blueprints emitted lifetime.
     pub total_blueprints_emitted: u64,
+
+    // ── Economy tracking (fed by AuctionHouse trades) ─────────────────────
+    /// Accumulated inflation signal from individual trade transactions.
+    ///
+    /// Incremented by [`WorldDirector::record_trade`] each time a sale
+    /// completes.  Decays each tick via [`WorldDirector::recover_economy`].
+    /// When it exceeds `config.economy_adjustment_threshold` the director
+    /// emits a loot table blueprint to restore balance.
+    pub economy_delta_accumulator: f32,
+
+    // ── Faction balance (fed by zone-control snapshots) ───────────────────
+    /// Zone-control ratio per faction (faction_id → fraction of total zones).
+    ///
+    /// Updated by [`WorldDirector::update_faction_balance`] each tick from
+    /// the current zone-ownership snapshot.  Used by the economy policy to
+    /// detect faction snowball and add scarcity pressure.
+    pub faction_balance: BTreeMap<String, f32>,
 }
 
 // ─── Decision record ─────────────────────────────────────────────────────────
@@ -214,7 +231,18 @@ impl WorldDirector {
     // ── Policy 2: Loot economy ────────────────────────────────────────────────
 
     fn evaluate_economy(&mut self, global: &GlobalPressure, tick: u64) -> Option<DirectorDecision> {
-        if !global.is_inflating() && !global.is_deflating() { return None; }
+        // Also trigger on accumulated trade-inflation or dominant-faction snowball.
+        let dominant_snowball = self.state.faction_balance.values()
+            .any(|&f| f > 0.75);
+        let accumulator_over_threshold =
+            self.state.economy_delta_accumulator > self.config.economy_adjustment_threshold;
+
+        if !global.is_inflating() && !global.is_deflating()
+            && !accumulator_over_threshold
+            && !dominant_snowball
+        {
+            return None;
+        }
 
         let since = tick.saturating_sub(self.state.last_economy_adjustment);
         if since < self.config.economy_cooldown_ticks { return None; }
@@ -291,6 +319,52 @@ impl WorldDirector {
     pub fn recent_decisions(&self, n: usize) -> &[DirectorDecision] {
         let start = self.history.len().saturating_sub(n);
         &self.history[start..]
+    }
+
+    // ── Economy + balance hooks ───────────────────────────────────────────────
+    // Migrated from bifrost-safe-city::WorldDirector (which was a separate,
+    // R2/R3-violating director struct).  These are now the canonical home for
+    // per-trade economy tracking and faction-balance monitoring.
+
+    /// Record that a trade completed for `gold_value` coins.
+    ///
+    /// Called by the server's `buy_listing` handler after each successful sale.
+    /// Inflates the economy accumulator proportionally to trade size — large
+    /// trades push the Director toward emitting a scarcity loot blueprint.
+    pub fn record_trade(&mut self, gold_value: u32) {
+        // 10 000 gold ≈ 0.01 delta.  Capped so a single mega-trade can't
+        // instantly trigger the loot policy.
+        let impact = (gold_value as f32 / 10_000.0).min(0.01);
+        self.state.economy_delta_accumulator =
+            (self.state.economy_delta_accumulator + impact).min(1.0);
+    }
+
+    /// Passively recover the economy accumulator by one small step.
+    ///
+    /// Call **once per game tick** (in `advance_tick`) after [`tick`] returns.
+    /// Prevents permanent inflation buildup from high-volume trading periods.
+    pub fn recover_economy(&mut self) {
+        self.state.economy_delta_accumulator =
+            (self.state.economy_delta_accumulator - 0.0005_f32).max(0.0);
+    }
+
+    /// Update faction zone-control balance from the current ownership snapshot.
+    ///
+    /// Call once per tick with the count of zones each faction controls and the
+    /// total number of zones in the world.  The director detects snowball risk
+    /// (any faction > 75 % of zones) and will emit scarcity blueprints.
+    pub fn update_faction_balance(
+        &mut self,
+        zone_control: &BTreeMap<String, u32>,
+        total_zones: u32,
+    ) {
+        self.state.faction_balance.clear();
+        for (faction, &zones) in zone_control {
+            self.state.faction_balance.insert(
+                faction.clone(),
+                zones as f32 / total_zones.max(1) as f32,
+            );
+        }
     }
 }
 

@@ -56,4 +56,4 @@ pub use event::{WorldEvent, EventType, AuthorId, EventPayload};
 pub use quest::{Quest, QuestObjective, QuestReward, QuestRegistry};
 pub use story::{StoryArc, StoryBeat, WorldMood, StoryEngine};
 pub use npc::{NpcState, AiContext, NpcBehavior, NpcDialogueTrigger, NpcRegistry, NpcTickInput};
-pub use aigm::{AiGmState, AiGmTick, AiGmError, TickBudget};
+pub use aigm::{AiGmState, AiGmTick, AiGmError, AiGmBudget, AiGmBudgetUsage};

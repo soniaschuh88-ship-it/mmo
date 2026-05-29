@@ -18,7 +18,7 @@ use bifrost_vis::{
 };
 
 use crate::material::MaterialProps;
-use crate::vec3::Vec3;
+use crate::vec3::PhysicsVec3;
 use crate::voxel::{flags, VoxelState};
 use crate::world::PhysicsWorld;
 
@@ -98,7 +98,7 @@ impl PhysicsExecutor {
         for x in (cx - r)..=(cx + r) {
             for y in (cy - r)..=(cy + r) {
                 for z in (cz - r)..=(cz + r) {
-                    if Vec3::int_dist_sq(x, y, z, cx, cy, cz) <= r_sq {
+                    if PhysicsVec3::int_dist_sq(x, y, z, cx, cy, cz) <= r_sq {
                         world.set((x, y, z), VoxelState::solid(p.material));
                     }
                 }
@@ -134,7 +134,7 @@ impl PhysicsExecutor {
             for x in (cx - r)..=(cx + r) {
                 for y in (cy - r)..=(cy + r) {
                     for z in (cz - r)..=(cz + r) {
-                        if Vec3::int_dist_sq(x, y, z, cx, cy, cz) <= r_sq {
+                        if PhysicsVec3::int_dist_sq(x, y, z, cx, cy, cz) <= r_sq {
                             keys.push((x, y, z));
                         }
                     }
@@ -202,7 +202,7 @@ impl PhysicsExecutor {
             for x in (ox - r)..=(ox + r) {
                 for y in (oy - r)..=(oy + r) {
                     for z in (oz - r)..=(oz + r) {
-                        if Vec3::int_dist_sq(x, y, z, ox, oy, oz) <= r_sq {
+                        if PhysicsVec3::int_dist_sq(x, y, z, ox, oy, oz) <= r_sq {
                             v.push((x, y, z));
                         }
                     }
@@ -216,7 +216,7 @@ impl PhysicsExecutor {
             if let Some(voxel) = world.get(key).cloned() {
                 let mut v = voxel;
                 v.flags |= flags::UNSTABLE;
-                v.velocity = Vec3::new(impulse_vel, impulse_vel, impulse_vel);
+                v.velocity = PhysicsVec3::new(impulse_vel, impulse_vel, impulse_vel);
                 world.set(key, v);
             }
         }

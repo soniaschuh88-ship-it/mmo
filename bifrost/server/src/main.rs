@@ -29,6 +29,7 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+mod admin;
 mod api;
 mod models;
 mod state;
@@ -100,6 +101,23 @@ async fn main() {
         .route("/aigm/quests",                        get(api::aigm_quests_list))
         .route("/aigm/quests/:chain_id/accept",       post(api::aigm_quest_accept))
         .route("/aigm/npcs",                          get(api::aigm_npcs))
+        // Admin API — world-data.json read/write for the admin panel
+        .route("/admin-api/world",                              get(admin::get_world).put(admin::put_world))
+        .route("/admin-api/biomes",                             get(admin::get_biomes).post(admin::create_biome))
+        .route("/admin-api/biomes/:id",                         axum::routing::put(admin::update_biome).delete(admin::delete_biome))
+        .route("/admin-api/story",                              get(admin::get_story))
+        .route("/admin-api/story/arcs",                         post(admin::create_arc))
+        .route("/admin-api/story/arcs/:id",                     axum::routing::put(admin::update_arc).delete(admin::delete_arc))
+        .route("/admin-api/story/arcs/:arc_id/beats",           post(admin::create_beat))
+        .route("/admin-api/story/arcs/:arc_id/beats/:beat_id",  axum::routing::put(admin::update_beat).delete(admin::delete_beat))
+        .route("/admin-api/npcs",                               get(admin::get_npcs).post(admin::create_npc))
+        .route("/admin-api/npcs/:id",                           axum::routing::put(admin::update_npc).delete(admin::delete_npc))
+        .route("/admin-api/quests",                             get(admin::get_quests).post(admin::create_quest))
+        .route("/admin-api/quests/:id",                         axum::routing::put(admin::update_quest).delete(admin::delete_quest))
+        .route("/admin-api/loot/monsters",                      get(admin::get_monsters).post(admin::create_monster))
+        .route("/admin-api/loot/monsters/:id",                  axum::routing::put(admin::update_monster).delete(admin::delete_monster))
+        .route("/admin-api/loot/items",                         get(admin::get_loot_items).post(admin::create_loot_item))
+        .route("/admin-api/loot/items/:id",                     axum::routing::put(admin::update_loot_item).delete(admin::delete_loot_item))
         // Safe City — economy, auction house, zone control
         .route("/safe-city",                          get(api::safe_city_info))
         .route("/safe-city/auction",                  get(api::auction_listings))

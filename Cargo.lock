@@ -143,6 +143,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bifrost-items"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "bifrost-kernel"
 version = "0.1.0"
 dependencies = [
@@ -191,6 +200,7 @@ dependencies = [
 name = "bifrost-safe-city"
 version = "0.1.0"
 dependencies = [
+ "bifrost-kernel",
  "serde",
  "serde_json",
  "thiserror",

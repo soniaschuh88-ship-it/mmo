@@ -27,6 +27,6 @@ pub mod world;
 pub use executor::{PhysicsExecutor, PhysicsTickResult};
 pub use material::{MaterialProps, MAT_AIR, MAT_DIRT, MAT_GRASS, MAT_IRON,
                    MAT_SAND, MAT_STONE, MAT_WATER, MAT_WOOD};
-pub use vec3::Vec3;
+pub use vec3::PhysicsVec3;
 pub use voxel::{flags, VoxelKey, VoxelState};
 pub use world::PhysicsWorld;

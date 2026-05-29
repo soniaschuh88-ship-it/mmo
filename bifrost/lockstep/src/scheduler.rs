@@ -1,6 +1,6 @@
 //! LockstepScheduler — zone-aware deterministic tick orchestrator.
 //!
-//! Each scheduler owns one `ZoneId`. Submissions for a different zone are
+//! Each scheduler owns one `ShardId`. Submissions for a different zone are
 //! rejected — use a separate scheduler per zone.
 //!
 //! # Advance Rule
@@ -20,7 +20,7 @@ use bifrost_vis::VoxelProgram;
 use crate::barrier::TickBarrier;
 use crate::budget::{BudgetError, TickBudget, TickUsage};
 use crate::input::InputBuffer;
-use crate::tick::{LockstepTick, ZoneId};
+use crate::tick::{LockstepTick, ShardId};
 
 const MAX_AHEAD_TICKS: u64 = 8;
 
@@ -47,7 +47,7 @@ pub struct TickAdvance {
 /// Orchestrates deterministic lockstep execution for a single zone.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LockstepScheduler {
-    zone_id:          ZoneId,
+    zone_id:          ShardId,
     current_tick:     LockstepTick,
     tick_duration_ms: u16,
     barrier:          TickBarrier,
@@ -59,13 +59,13 @@ pub struct LockstepScheduler {
 }
 
 impl LockstepScheduler {
-    /// Create a scheduler for `ZoneId::GLOBAL` (backward-compatible default).
+    /// Create a scheduler for `ShardId::GLOBAL` (backward-compatible default).
     pub fn new(tick_duration_ms: u16) -> Self {
-        Self::for_zone(ZoneId::GLOBAL, tick_duration_ms)
+        Self::for_zone(ShardId::GLOBAL, tick_duration_ms)
     }
 
     /// Create a scheduler for a specific zone.
-    pub fn for_zone(zone_id: ZoneId, tick_duration_ms: u16) -> Self {
+    pub fn for_zone(zone_id: ShardId, tick_duration_ms: u16) -> Self {
         Self {
             zone_id,
             current_tick: LockstepTick::zone_start(zone_id, 0),
@@ -140,7 +140,7 @@ impl LockstepScheduler {
 
     pub fn current_tick(&self)     -> LockstepTick  { self.current_tick }
     pub fn tick_duration_ms(&self) -> u16           { self.tick_duration_ms }
-    pub fn zone_id(&self)          -> ZoneId        { self.zone_id }
+    pub fn zone_id(&self)          -> ShardId        { self.zone_id }
     pub fn peer_count(&self)       -> usize         { self.barrier.peer_count() }
     pub fn current_usage(&self)    -> &TickUsage    { &self.usage }
     pub fn budget(&self)           -> &TickBudget   { &self.budget }
@@ -201,10 +201,10 @@ mod tests {
 
     #[test]
     fn zone_mismatch_rejected() {
-        let mut s = LockstepScheduler::for_zone(ZoneId::new(1), 50);
+        let mut s = LockstepScheduler::for_zone(ShardId::new(1), 50);
         s.register_peer(p(1));
         // Submission for zone 2 → rejected
-        let wrong_zone = LockstepTick::at(ZoneId::new(2), 0, 0);
+        let wrong_zone = LockstepTick::at(ShardId::new(2), 0, 0);
         assert!(matches!(
             s.submit_input(p(1), wrong_zone, empty_prog()),
             Err(SchedulerError::ZoneMismatch { .. })
@@ -250,8 +250,8 @@ mod tests {
 
     #[test]
     fn for_zone_starts_in_correct_zone() {
-        let s = LockstepScheduler::for_zone(ZoneId::new(7), 50);
-        assert_eq!(s.current_tick().zone_id(), ZoneId::new(7));
+        let s = LockstepScheduler::for_zone(ShardId::new(7), 50);
+        assert_eq!(s.current_tick().zone_id(), ShardId::new(7));
         assert_eq!(s.current_tick().local_seq(), 0);
     }
 

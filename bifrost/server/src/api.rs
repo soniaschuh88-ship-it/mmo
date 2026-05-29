@@ -294,6 +294,20 @@ pub async fn advance_tick(State(shared): State<SharedState>) -> impl IntoRespons
     let current = s.scheduler.current_tick();
     let advance = s.scheduler.try_advance();
 
+    // Economy + faction-balance hooks: called once per tick regardless of
+    // whether the tick actually advanced (ensures steady-state recovery).
+    s.director.recover_economy();
+    {
+        let total_zones = s.zones.len() as u32;
+        let mut zone_control: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
+        for zone in s.zones.values() {
+            if let bifrost_safe_city::ZoneState::Controlled { faction_id } = &zone.state {
+                *zone_control.entry(faction_id.clone()).or_insert(0) += 1;
+            }
+        }
+        s.director.update_faction_balance(&zone_control, total_zones);
+    }
+
     match advance {
         None => {
             (StatusCode::ACCEPTED, Json(AdvanceResp {
@@ -1004,9 +1018,14 @@ pub async fn buy_listing(
     };
     let mut s = shared.lock().await;
     match s.safe_city.market.buy(id, &req.buyer_id, req.budget) {
-        Ok(receipt) => Json(json!({ "ok": true, "receipt": receipt })).into_response(),
-        Err(e)      => (StatusCode::UNPROCESSABLE_ENTITY,
-                        Json(json!({ "error": e.to_string() }))).into_response(),
+        Ok(gold_spent) => {
+            // R3 economy hook: record every trade so the World Director can
+            // detect inflation and emit scarcity blueprints.
+            s.director.record_trade(gold_spent);
+            Json(json!({ "ok": true, "receipt": gold_spent })).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY,
+                   Json(json!({ "error": e.to_string() }))).into_response(),
     }
 }
 

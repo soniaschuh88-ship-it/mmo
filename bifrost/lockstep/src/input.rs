@@ -61,7 +61,7 @@ impl InputBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tick::ZoneId;
+    use crate::tick::ShardId;
     use bifrost_vis::{InstructionPayload, SetVoxelPayload, VoxelCoord};
 
     fn t(seq: u64) -> LockstepTick { LockstepTick::from_legacy(seq) }
@@ -104,8 +104,8 @@ mod tests {
     #[test]
     fn multi_zone_no_collision() {
         let mut buf = InputBuffer::new();
-        let z1 = LockstepTick::at(ZoneId::new(1), 0, 0);
-        let z2 = LockstepTick::at(ZoneId::new(2), 0, 0);
+        let z1 = LockstepTick::at(ShardId::new(1), 0, 0);
+        let z2 = LockstepTick::at(ShardId::new(2), 0, 0);
         buf.submit(z1, p(1), make_program());
         buf.submit(z2, p(1), make_program());
         // Both ticks stored — different keys despite same local_seq=0

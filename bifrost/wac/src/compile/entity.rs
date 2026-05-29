@@ -5,6 +5,7 @@ use rand::rngs::StdRng;
 
 use crate::types::*;
 use crate::validate::WacError;
+use super::has;
 
 /// Size tier keywords and stat multipliers.
 const BOSS_KEYS:   &[&str] = &["boss","overlord","lord","king","queen","giant","titan","ancient"];
@@ -90,7 +91,7 @@ pub fn compile(bp: &crate::types::AssetBlueprint) -> Result<EntityPrefabIR, WacE
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-fn has(spec: &str, keys: &[&str]) -> bool { keys.iter().any(|k| spec.contains(k)) }
+// `has` is imported from `compile/mod.rs`.
 
 fn extract_entity_id(spec: &str) -> String {
     let nouns = ["wolf","goblin","skeleton","rat","bat","troll","golem","dragon",

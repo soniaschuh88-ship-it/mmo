@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub type ZoneId    = String;
-pub type FactionId = String;
+// R1: import canonical types from bifrost-kernel — no local redefinitions.
+pub use bifrost_kernel::{FactionId, ZoneId};
 
 // ─── ResourceMap ─────────────────────────────────────────────────────────────
 

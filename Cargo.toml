@@ -14,11 +14,12 @@ members = [
     "bifrost/run",
     "bifrost/synthesis",
     "bifrost/safe-city",
-    # ── NOVA Engine (born in the Forge) ───────────────────────────────────────
-    "bifrost/forge/nova-core",    # ECS · Transform3D · SceneGraph · Time
-    "bifrost/forge/nova-render",  # WebGPU voxel pipeline · Camera3D · WGSL shaders
-    "bifrost/forge/nova-anim",    # VoxelSkeleton · AnimClip · AnimFSM · wac-bridge
-    "bifrost/forge/nova-input",   # KeyCode/Mouse → ActionId abstraction
+    "bifrost/items",
+    # ── NOVA Engine ───────────────────────────────────────────────────────────
+    "bifrost/nova-core",    # ECS · Transform3D · SceneGraph · Time
+    "bifrost/nova-render",  # WebGPU voxel pipeline · Camera3D · WGSL shaders
+    "bifrost/nova-anim",    # VoxelSkeleton · AnimClip · AnimFSM · wac-bridge
+    "bifrost/nova-input",   # KeyCode/Mouse → ActionId abstraction
 ]
 
 [workspace.package]
@@ -71,8 +72,9 @@ bifrost-wasm     = { path = "bifrost/wasm" }
 bifrost-run       = { path = "bifrost/run" }
 bifrost-synthesis  = { path = "bifrost/synthesis" }
 bifrost-safe-city  = { path = "bifrost/safe-city" }
-# NOVA Engine — born in the Forge
-nova-core    = { path = "bifrost/forge/nova-core" }
-nova-render  = { path = "bifrost/forge/nova-render" }
-nova-anim    = { path = "bifrost/forge/nova-anim" }
-nova-input   = { path = "bifrost/forge/nova-input" }
+bifrost-items      = { path = "bifrost/items" }
+# NOVA Engine — at bifrost/ level
+nova-core    = { path = "bifrost/nova-core" }
+nova-render  = { path = "bifrost/nova-render" }
+nova-anim    = { path = "bifrost/nova-anim" }
+nova-input   = { path = "bifrost/nova-input" }

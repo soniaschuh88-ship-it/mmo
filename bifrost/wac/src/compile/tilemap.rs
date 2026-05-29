@@ -16,6 +16,7 @@ use rand::rngs::StdRng;
 use crate::biomes::{BiomeKey, BIOME_IDS};
 use crate::types::{AssetBlueprint, TileMapIR};
 use crate::validate::WacError;
+use super::make_id;
 
 const DEFAULT_W: u32 = 16;
 const DEFAULT_H: u32 = 16;
@@ -116,8 +117,4 @@ fn parse_size_constraints(constraints: &[String], dw: u32, dh: u32) -> (u32, u32
     (w, h)
 }
 
-fn make_id(spec: &str) -> String {
-    spec.split_whitespace().take(4).collect::<Vec<_>>().join("_")
-        .chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_')
-        .collect::<String>().to_lowercase()
-}
+// `make_id` is imported from `compile/mod.rs`.
